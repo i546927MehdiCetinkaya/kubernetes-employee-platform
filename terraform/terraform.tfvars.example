@@ -1,0 +1,30 @@
+# Example Terraform Variables Configuration
+# Copy this file to terraform.tfvars and fill in your actual values
+# NEVER commit terraform.tfvars to version control (it's in .gitignore)
+
+# GCP Project Configuration
+project_id = "your-gcp-project-id"        # Replace with your GCP project ID
+region     = "europe-west4"                # Netherlands region (close to student)
+environment = "dev"                        # Environment: dev, staging, or prod
+
+# VPC Configuration
+vpc_cidr             = "10.100.0.0/16"     # Main VPC CIDR
+database_subnet_cidr = "10.100.2.0/24"     # Database subnet
+gke_subnet_cidr      = "10.100.1.0/24"     # GKE subnet
+
+# Cloud SQL Configuration
+database_tier                    = "db-f1-micro"  # Cost-efficient tier (~€25-30/month)
+database_version                 = "POSTGRES_15"   # PostgreSQL version
+database_availability_type       = "REGIONAL"      # REGIONAL for HA, ZONAL for single-zone
+database_backup_retention_days   = 7               # Backup retention period
+database_disk_size_gb            = 20              # Initial disk size
+database_disk_type               = "PD_SSD"        # SSD for better performance
+enable_pitr                      = true            # Enable Point-in-Time Recovery
+
+# Resource Labels
+labels = {
+  project     = "casestudy3"
+  managed_by  = "terraform"
+  student     = "mehdi-cetinkaya"
+  course      = "nca"
+}
