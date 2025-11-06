@@ -301,7 +301,7 @@ jobs:
 
   post-deployment-tests:
     name: Post-Deployment Tests
-    needs: [deploy-kubernetes, build-images]
+    needs: [deploy-infrastructure, deploy-kubernetes, build-images]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
