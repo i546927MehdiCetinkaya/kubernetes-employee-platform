@@ -93,7 +93,7 @@ jobs:
           terraform show -no-color tfplan > plan.txt
 
       - name: Upload Plan
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
           path: terraform/tfplan
@@ -152,7 +152,7 @@ jobs:
         run: terraform init
 
       - name: Download Plan
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: terraform-plan
           path: terraform/
@@ -169,7 +169,7 @@ jobs:
           terraform output -json > outputs.json
 
       - name: Upload Terraform Outputs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: terraform-outputs
           path: terraform/outputs.json
