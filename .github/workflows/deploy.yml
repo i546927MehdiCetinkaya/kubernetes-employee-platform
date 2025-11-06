@@ -166,7 +166,7 @@ jobs:
         id: output
         working-directory: ./terraform
         run: |
-          echo "cluster_name=$(terraform output -raw eks_cluster_name)" >> $GITHUB_OUTPUT
+          echo "cluster_name=$(terraform output -raw cluster_name)" >> $GITHUB_OUTPUT
           terraform output -json > outputs.json
 
       - name: Upload Terraform Outputs

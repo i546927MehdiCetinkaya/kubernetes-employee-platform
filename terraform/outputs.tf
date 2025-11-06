@@ -25,6 +25,11 @@ output "eks_cluster_name" {
   value       = module.eks.cluster_name
 }
 
+output "cluster_name" {
+  description = "Alias for EKS cluster name (used by CI/CD)"
+  value       = module.eks.cluster_name
+}
+
 output "eks_cluster_endpoint" {
   description = "Endpoint of the EKS cluster"
   value       = module.eks.cluster_endpoint
