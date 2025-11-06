@@ -43,17 +43,18 @@ jobs:
         working-directory: ./terraform
         run: terraform validate
 
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: ${{ env.KUBECTL_VERSION }}
-
-      - name: Validate Kubernetes Manifests
+      - name: Install kubeval
         run: |
-          kubectl apply --dry-run=client -f kubernetes/rbac.yaml
-          kubectl apply --dry-run=client -f kubernetes/network-policies.yaml
-          kubectl apply --dry-run=client -f kubernetes/hr-portal.yaml
-          kubectl apply --dry-run=client -f kubernetes/workspaces.yaml
+          wget https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz
+          tar xf kubeval-linux-amd64.tar.gz
+          sudo mv kubeval /usr/local/bin
+
+      - name: Validate Kubernetes Manifests with kubeval
+        run: |
+          kubeval --strict kubernetes/rbac.yaml
+          kubeval --strict kubernetes/network-policies.yaml
+          kubeval --strict kubernetes/hr-portal.yaml
+          kubeval --strict kubernetes/workspaces.yaml
 
   plan:
     name: Terraform Plan
