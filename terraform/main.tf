@@ -16,12 +16,7 @@ terraform {
     }
   }
 
-  # Optional: Configure remote state
-  # backend "s3" {
-  #   bucket = "innovatech-terraform-state"
-  #   key    = "eks-employee-lifecycle/terraform.tfstate"
-  #   region = "eu-west-1"
-  # }
+  # Backend configuration moved to backend.tf
 }
 
 provider "aws" {
