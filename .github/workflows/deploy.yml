@@ -43,18 +43,19 @@ jobs:
         working-directory: ./terraform
         run: terraform validate
 
-      - name: Install kubeval
+      - name: Install kubeconform
         run: |
-          wget https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz
-          tar xf kubeval-linux-amd64.tar.gz
-          sudo mv kubeval /usr/local/bin
+          wget https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform-linux-amd64.tar.gz
+          sudo mv kubeconform /usr/local/bin
+          chmod +x /usr/local/bin/kubeconform
 
-      - name: Validate Kubernetes Manifests with kubeval
+      - name: Validate Kubernetes Manifests
         run: |
-          kubeval --kubernetes-version 1.28.0 kubernetes/rbac.yaml
-          kubeval --kubernetes-version 1.28.0 kubernetes/network-policies.yaml
-          kubeval --kubernetes-version 1.28.0 kubernetes/hr-portal.yaml
-          kubeval --kubernetes-version 1.28.0 kubernetes/workspaces.yaml
+          kubeconform -summary -output pretty kubernetes/rbac.yaml
+          kubeconform -summary -output pretty kubernetes/network-policies.yaml
+          kubeconform -summary -output pretty kubernetes/hr-portal.yaml
+          kubeconform -summary -output pretty kubernetes/workspaces.yaml
 
   plan:
     name: Terraform Plan
