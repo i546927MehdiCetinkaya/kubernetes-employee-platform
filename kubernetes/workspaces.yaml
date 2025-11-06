@@ -5,7 +5,7 @@ metadata:
   name: workspace-provisioner
   namespace: workspaces
   annotations:
-    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/innovatech-employee-lifecycle-workspace-role"
+    eks.amazonaws.com/role-arn: "arn:aws:iam::920120424621:role/innovatech-employee-lifecycle-workspace-role"
 ---
 # StorageClass for Workspace Persistent Volumes
 apiVersion: storage.k8s.io/v1
@@ -46,7 +46,7 @@ spec:
   serviceAccountName: workspace-provisioner
   containers:
   - name: code-server
-    image: ACCOUNT_ID.dkr.ecr.eu-west-1.amazonaws.com/employee-workspace:latest
+    image: 920120424621.dkr.ecr.eu-west-1.amazonaws.com/employee-workspace:latest
     imagePullPolicy: Always
     ports:
     - containerPort: 8080

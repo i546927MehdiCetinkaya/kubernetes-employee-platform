@@ -226,11 +226,13 @@ jobs:
         run: kubectl apply -f kubernetes/hr-portal.yaml
 
       - name: Wait for deployments
+        continue-on-error: true
         run: |
+          echo "Waiting for deployments to be ready..."
           kubectl wait --for=condition=available --timeout=300s \
-            deployment/hr-portal-backend -n hr-portal || true
+            deployment/hr-portal-backend -n hr-portal || echo "Backend deployment timeout"
           kubectl wait --for=condition=available --timeout=300s \
-            deployment/hr-portal-frontend -n hr-portal || true
+            deployment/hr-portal-frontend -n hr-portal || echo "Frontend deployment timeout"
 
       - name: Get deployment status
         run: |
