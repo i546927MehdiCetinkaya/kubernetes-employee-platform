@@ -166,7 +166,12 @@ jobs:
         id: output
         working-directory: ./terraform
         run: |
-          echo "cluster_name=$(terraform output -raw cluster_name)" >> $GITHUB_OUTPUT
+          echo "=== Listing all Terraform outputs ==="
+          terraform output
+          echo "=== Getting cluster_name output ==="
+          CLUSTER_NAME=$(terraform output -raw cluster_name)
+          echo "Cluster name is: $CLUSTER_NAME"
+          echo "cluster_name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
           terraform output -json > outputs.json
 
       - name: Upload Terraform Outputs
