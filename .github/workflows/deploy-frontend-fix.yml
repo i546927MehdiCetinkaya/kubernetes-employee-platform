@@ -1,0 +1,94 @@
+name: Deploy Frontend Fix
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-west-1
+  CLUSTER_NAME: innovatech-employee-lifecycle
+
+jobs:
+  deploy-fixed-frontend:
+    name: Deploy Fixed Frontend
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::920120424621:role/githubrepo
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: v1.28.4
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+
+      - name: Apply Updated Kubernetes Manifests
+        run: |
+          echo "Applying updated hr-portal manifest with writable volumes..."
+          kubectl apply -f kubernetes/hr-portal.yaml
+
+      - name: Wait for Frontend Deployment
+        run: |
+          echo "Waiting for frontend deployment to be ready (max 5min)..."
+          kubectl rollout status deployment/hr-portal-frontend -n hr-portal --timeout=5m
+
+      - name: Check Deployment Status
+        run: |
+          echo "=== Frontend Pods ==="
+          kubectl get pods -n hr-portal -l app=hr-portal-frontend -o wide
+          echo ""
+          echo "=== Frontend Deployment ==="
+          kubectl get deployment hr-portal-frontend -n hr-portal
+          echo ""
+          echo "=== Services ==="
+          kubectl get svc -n hr-portal
+
+      - name: Get Frontend Logs
+        continue-on-error: true
+        run: |
+          echo "=== Frontend Logs (last 30 lines) ==="
+          kubectl logs -n hr-portal -l app=hr-portal-frontend --tail=30
+
+      - name: Check Ingress
+        run: |
+          echo "=== Ingress Status ==="
+          kubectl get ingress -n hr-portal
+          echo ""
+          echo "=== Ingress Details ==="
+          kubectl describe ingress hr-portal -n hr-portal
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "============================================="
+          echo "              DEPLOYMENT COMPLETE"
+          echo "============================================="
+          echo ""
+          
+          READY=$(kubectl get deployment hr-portal-frontend -n hr-portal -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+          DESIRED=$(kubectl get deployment hr-portal-frontend -n hr-portal -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "2")
+          
+          echo "Frontend Pods: $READY/$DESIRED ready"
+          echo ""
+          
+          if [ "$READY" == "$DESIRED" ]; then
+            echo "✅ Frontend is now running successfully!"
+            echo ""
+            echo "Next steps:"
+            echo "1. Wait 5-10 minutes for ALB DNS to propagate"
+            echo "2. Access your application via the LoadBalancer URL"
+          else
+            echo "⚠️ Some pods are not ready yet. Check logs above."
+          fi
