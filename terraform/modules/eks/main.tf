@@ -181,6 +181,34 @@ resource "aws_iam_role_policy_attachment" "registry_policy" {
   role       = aws_iam_role.node.name
 }
 
+# AWS Load Balancer Controller Policy
+resource "aws_iam_role_policy" "load_balancer_controller" {
+  name = "load-balancer-controller"
+  role = aws_iam_role.node.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeAvailabilityZones",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeInstances",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DescribeTags",
+          "ec2:CreateTags",
+          "ec2:DeleteTags",
+          "elasticloadbalancing:*"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # OIDC Provider for IRSA (IAM Roles for Service Accounts)
 data "tls_certificate" "cluster" {
   url = aws_eks_cluster.main.identity[0].oidc[0].issuer
