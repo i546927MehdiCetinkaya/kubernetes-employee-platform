@@ -1,0 +1,80 @@
+name: Restart Load Balancer Controller
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-west-1
+  CLUSTER_NAME: innovatech-employee-lifecycle
+
+jobs:
+  restart-controller:
+    name: Restart LB Controller  
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::920120424621:role/githubrepo
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.28.4'
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+
+      - name: Check current node role IAM policy
+        run: |
+          echo "=== Current Node Role Policies ==="
+          aws iam list-attached-role-policies --role-name innovatech-employee-lifecycle-node-role
+          echo ""
+          echo "=== Inline Policies ==="
+          aws iam list-role-policies --role-name innovatech-employee-lifecycle-node-role
+          echo ""
+          echo "=== Load Balancer Controller Policy Content ==="
+          aws iam get-role-policy --role-name innovatech-employee-lifecycle-node-role --policy-name load-balancer-controller || echo "Policy not found"
+
+      - name: Delete Load Balancer Controller pods
+        run: |
+          echo "Deleting Load Balancer Controller pods to pick up new IAM permissions..."
+          kubectl delete pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+
+      - name: Wait for new pods
+        run: |
+          echo "Waiting for new controller pods to start..."
+          kubectl wait --namespace kube-system \
+            --for=condition=ready pod \
+            --selector=app.kubernetes.io/name=aws-load-balancer-controller \
+            --timeout=120s
+
+      - name: Check controller logs
+        run: |
+          echo "=== Controller Logs (last 30 lines) ==="
+          kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --tail=30
+
+      - name: Delete and recreate Ingress to trigger reconciliation
+        run: |
+          echo "Recreating Ingress to trigger LoadBalancer creation..."
+          kubectl delete ingress hr-portal -n hr-portal || echo "Ingress not found"
+          sleep 5
+          kubectl apply -f kubernetes/hr-portal.yaml
+
+      - name: Wait and check Ingress
+        run: |
+          echo "Waiting 60 seconds for LoadBalancer to be provisioned..."
+          sleep 60
+          
+          echo "=== Ingress Status ==="
+          kubectl get ingress -n hr-portal
+          echo ""
+          kubectl describe ingress hr-portal -n hr-portal
