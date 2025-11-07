@@ -1,0 +1,86 @@
+name: Fix EKS Access
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-west-1
+  CLUSTER_NAME: innovatech-employee-lifecycle
+
+jobs:
+  add-eks-access:
+    name: Add SSO Role to aws-auth
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::920120424621:role/githubrepo
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: v1.28.4
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+          kubectl cluster-info
+
+      - name: Check current aws-auth ConfigMap
+        continue-on-error: true
+        run: |
+          echo "=== Current aws-auth ConfigMap ==="
+          kubectl get configmap aws-auth -n kube-system -o yaml || echo "ConfigMap does not exist"
+
+      - name: Apply aws-auth ConfigMap
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: aws-auth
+            namespace: kube-system
+          data:
+            mapRoles: |
+              - rolearn: arn:aws:iam::920120424621:role/innovatech-employee-lifecycle-node-role
+                username: system:node:{{EC2PrivateDNSName}}
+                groups:
+                  - system:bootstrappers
+                  - system:nodes
+              - rolearn: arn:aws:iam::920120424621:role/githubrepo
+                username: github-actions
+                groups:
+                  - system:masters
+              - rolearn: arn:aws:iam::920120424621:role/AWSReservedSSO_fictisb_IsbUsersPS_2f9b7e07b8441d9f
+                username: admin
+                groups:
+                  - system:masters
+          EOF
+
+      - name: Verify ConfigMap
+        run: |
+          echo "=== Updated aws-auth ConfigMap ==="
+          kubectl get configmap aws-auth -n kube-system -o yaml
+
+      - name: Test Access
+        run: |
+          echo "=== Verifying cluster access ==="
+          kubectl get nodes
+          kubectl get namespaces
+          echo ""
+          echo "✅ EKS access configured successfully!"
+          echo ""
+          echo "You can now use kubectl from your local machine:"
+          echo "1. Run: aws sso login --profile fictisb_IsbUsersPS-920120424621"
+          echo "2. Run: aws eks update-kubeconfig --region eu-west-1 --name innovatech-employee-lifecycle --profile fictisb_IsbUsersPS-920120424621 --alias casestudy3"
+          echo "3. Run: kubectl config use-context casestudy3"
+          echo "4. Run: kubectl get nodes"
