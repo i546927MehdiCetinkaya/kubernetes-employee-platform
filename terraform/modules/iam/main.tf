@@ -47,7 +47,9 @@ resource "aws_iam_role_policy" "hr_portal_dynamodb" {
         ]
         Resource = [
           var.dynamodb_table_arn,
-          "${var.dynamodb_table_arn}/index/*"
+          "${var.dynamodb_table_arn}/index/*",
+          var.dynamodb_workspaces_table_arn,
+          "${var.dynamodb_workspaces_table_arn}/index/*"
         ]
       }
     ]

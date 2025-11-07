@@ -102,11 +102,12 @@ module "vpc_endpoints" {
 module "iam" {
   source = "./modules/iam"
 
-  cluster_name       = var.cluster_name
-  eks_oidc_issuer    = module.eks.oidc_issuer
-  eks_oidc_arn       = module.eks.oidc_provider_arn
-  dynamodb_table_arn = module.dynamodb.table_arn
-  environment        = var.environment
+  cluster_name                   = var.cluster_name
+  eks_oidc_issuer                = module.eks.oidc_issuer
+  eks_oidc_arn                   = module.eks.oidc_provider_arn
+  dynamodb_table_arn             = module.dynamodb.table_arn
+  dynamodb_workspaces_table_arn  = module.dynamodb.workspaces_table_arn
+  environment                    = var.environment
 
   depends_on = [module.eks, module.dynamodb]
 }

@@ -18,6 +18,11 @@ variable "dynamodb_table_arn" {
   type        = string
 }
 
+variable "dynamodb_workspaces_table_arn" {
+  description = "ARN of the DynamoDB workspaces table"
+  type        = string
+}
+
 variable "environment" {
   description = "Environment name"
   type        = string
