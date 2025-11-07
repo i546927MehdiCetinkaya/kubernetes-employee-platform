@@ -262,6 +262,8 @@ jobs:
         image:
           - name: hr-portal-backend
             path: ./applications/hr-portal/backend
+          - name: hr-portal-frontend
+            path: ./applications/hr-portal/frontend
           - name: employee-workspace
             path: ./applications/workspace
     steps:

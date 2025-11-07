@@ -100,7 +100,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/employees`, formData);
+      await axios.post(`${API_BASE_URL}/api/employees`, formData);
       setSuccess(`Employee ${formData.firstName} ${formData.lastName} created successfully!`);
       setOpenDialog(false);
       setFormData({
@@ -146,7 +146,6 @@ function App() {
     const colors = {
       developer: 'primary',
       manager: 'secondary',
-      hr: 'success',
       admin: 'warning',
     };
     return colors[role] || 'default';
@@ -343,7 +342,6 @@ function App() {
                 >
                   <MenuItem value="developer">Developer</MenuItem>
                   <MenuItem value="manager">Manager</MenuItem>
-                  <MenuItem value="hr">HR</MenuItem>
                   <MenuItem value="admin">Admin</MenuItem>
                 </Select>
               </FormControl>
