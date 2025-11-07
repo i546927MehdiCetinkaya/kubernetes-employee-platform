@@ -28,9 +28,9 @@ output "session_logs_log_group" {
 output "ssm_endpoints" {
   description = "VPC endpoints for Systems Manager"
   value = var.enable_session_manager ? {
-    ssm          = aws_vpc_endpoint.ssm[0].id
-    ssmmessages  = aws_vpc_endpoint.ssmmessages[0].id
-    ec2messages  = aws_vpc_endpoint.ec2messages[0].id
+    ssm         = aws_vpc_endpoint.ssm[0].id
+    ssmmessages = aws_vpc_endpoint.ssmmessages[0].id
+    ec2messages = aws_vpc_endpoint.ec2messages[0].id
   } : null
 }
 

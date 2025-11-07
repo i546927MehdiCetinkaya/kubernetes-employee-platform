@@ -194,9 +194,9 @@ resource "aws_ssm_parameter" "db_credentials" {
   description = "Database connection credentials"
   type        = "SecureString"
   value = jsonencode({
-    host     = "dynamodb.${data.aws_region.current.name}.amazonaws.com"
-    region   = data.aws_region.current.name
-    table    = "${var.cluster_name}-employees"
+    host   = "dynamodb.${data.aws_region.current.name}.amazonaws.com"
+    region = data.aws_region.current.name
+    table  = "${var.cluster_name}-employees"
   })
 
   tags = merge(var.tags, {
@@ -238,11 +238,11 @@ resource "aws_ssm_patch_baseline" "workspace_baseline" {
 resource "aws_ssm_maintenance_window" "patch_window" {
   count = var.enable_patch_manager ? 1 : 0
 
-  name              = "${var.cluster_name}-patch-window"
-  description       = "Maintenance window for applying patches"
-  schedule          = var.patch_schedule
-  duration          = 3
-  cutoff            = 1
+  name                       = "${var.cluster_name}-patch-window"
+  description                = "Maintenance window for applying patches"
+  schedule                   = var.patch_schedule
+  duration                   = 3
+  cutoff                     = 1
   allow_unassociated_targets = false
 
   tags = var.tags
@@ -330,10 +330,10 @@ resource "aws_ssm_association" "inventory_collection" {
   schedule_expression = "rate(1 day)"
 
   parameters = {
-    applications                 = "Enabled"
-    awsComponents                = "Enabled"
-    networkConfig                = "Enabled"
-    instanceDetailedInformation  = "Enabled"
+    applications                = "Enabled"
+    awsComponents               = "Enabled"
+    networkConfig               = "Enabled"
+    instanceDetailedInformation = "Enabled"
   }
 }
 
