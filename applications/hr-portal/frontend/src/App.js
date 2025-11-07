@@ -46,8 +46,8 @@ const theme = createTheme({
   },
 });
 
-// API configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+// API configuration - use same origin (LoadBalancer handles routing)
+const API_BASE_URL = process.env.REACT_APP_API_URL || window.location.origin;
 
 function App() {
   const [employees, setEmployees] = useState([]);
