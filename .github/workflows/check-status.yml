@@ -1,0 +1,101 @@
+name: Check App Status
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-west-1
+  CLUSTER_NAME: innovatech-employee-lifecycle
+
+jobs:
+  check-status:
+    name: Check Frontend & Backend Status
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::920120424621:role/githubrepo
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: v1.28.4
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+
+      - name: Check Nodes
+        run: |
+          echo "=== CLUSTER NODES ==="
+          kubectl get nodes -o wide
+
+      - name: Check Namespaces
+        run: |
+          echo "=== NAMESPACES ==="
+          kubectl get namespaces
+
+      - name: Check HR Portal Pods
+        run: |
+          echo "=== HR PORTAL PODS ==="
+          kubectl get pods -n hr-portal -o wide
+          echo ""
+          echo "=== POD DETAILS ==="
+          kubectl describe pods -n hr-portal
+
+      - name: Check Services
+        run: |
+          echo "=== HR PORTAL SERVICES ==="
+          kubectl get svc -n hr-portal -o wide
+
+      - name: Check Ingress/LoadBalancer
+        run: |
+          echo "=== INGRESS ==="
+          kubectl get ingress -n hr-portal -o wide
+          echo ""
+          echo "=== INGRESS DETAILS ==="
+          kubectl describe ingress -n hr-portal || echo "No ingress found"
+
+      - name: Check Deployments
+        run: |
+          echo "=== DEPLOYMENTS ==="
+          kubectl get deployments -n hr-portal -o wide
+
+      - name: Get Pod Logs
+        continue-on-error: true
+        run: |
+          echo "=== BACKEND LOGS (last 50 lines) ==="
+          kubectl logs -n hr-portal -l app=hr-portal-backend --tail=50 || echo "No backend pods running"
+          echo ""
+          echo "=== FRONTEND LOGS (last 50 lines) ==="
+          kubectl logs -n hr-portal -l app=hr-portal-frontend --tail=50 || echo "No frontend pods running"
+
+      - name: Check ConfigMaps
+        run: |
+          echo "=== CONFIGMAPS ==="
+          kubectl get configmap -n hr-portal
+
+      - name: Summary
+        run: |
+          echo ""
+          echo "============================================"
+          echo "           APP STATUS SUMMARY"
+          echo "============================================"
+          echo ""
+          
+          # Get LoadBalancer URL
+          LB_URL=$(kubectl get ingress -n hr-portal -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Not available yet")
+          
+          echo "📍 LoadBalancer URL: $LB_URL"
+          echo ""
+          echo "To access your app:"
+          echo "  Frontend: http://$LB_URL/"
+          echo "  Backend API: http://$LB_URL/api/employees"
+          echo ""
+          echo "Note: DNS propagation may take 5-10 minutes"
