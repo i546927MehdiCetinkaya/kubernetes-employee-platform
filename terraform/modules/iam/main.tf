@@ -56,6 +56,12 @@ resource "aws_iam_role_policy" "hr_portal_dynamodb" {
   })
 }
 
+# Attach SSM Parameter Store policy to HR Portal role
+resource "aws_iam_role_policy_attachment" "hr_portal_ssm" {
+  role       = aws_iam_role.hr_portal.name
+  policy_arn = var.ssm_policy_arn
+}
+
 # Workspace Provisioner Role
 resource "aws_iam_role" "workspace" {
   name = "${var.cluster_name}-workspace-role"

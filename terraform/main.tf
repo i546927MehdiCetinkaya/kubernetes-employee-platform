@@ -98,6 +98,26 @@ module "vpc_endpoints" {
   depends_on = [module.vpc]
 }
 
+# Systems Manager Module (SSM Parameter Store, Session Manager)
+module "systems_manager" {
+  source = "./modules/systems-manager"
+
+  cluster_name               = var.cluster_name
+  vpc_id                     = module.vpc.vpc_id
+  private_subnet_ids         = module.vpc.private_subnet_ids
+  workspace_domain           = "workspaces.innovatech.example.com"
+  enable_session_manager     = true
+  enable_patch_manager       = false
+  enable_state_manager       = false
+  
+  tags = {
+    Environment = var.environment
+    Project     = "InnovatechEmployeeLifecycle"
+  }
+
+  depends_on = [module.vpc]
+}
+
 # IAM Module
 module "iam" {
   source = "./modules/iam"
@@ -107,9 +127,10 @@ module "iam" {
   eks_oidc_arn                   = module.eks.oidc_provider_arn
   dynamodb_table_arn             = module.dynamodb.table_arn
   dynamodb_workspaces_table_arn  = module.dynamodb.workspaces_table_arn
+  ssm_policy_arn                 = module.systems_manager.hr_portal_ssm_policy_arn
   environment                    = var.environment
 
-  depends_on = [module.eks, module.dynamodb]
+  depends_on = [module.eks, module.dynamodb, module.systems_manager]
 }
 
 # EBS CSI Driver Module

@@ -48,6 +48,10 @@ yarn-error.log*
 *.tmp
 *.bak
 *.backup
+temp-outputs/
+delete-key.json
+ssm-fix.json
+*-fix.json
 
 # AWS
 .aws/

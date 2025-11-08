@@ -111,14 +111,14 @@ resource "aws_ssm_document" "session_manager_prefs" {
 resource "aws_s3_bucket" "session_logs" {
   count = var.enable_session_manager ? 1 : 0
 
-  bucket_prefix = "${var.cluster_name}-session-logs-"
+  bucket_prefix = "ssm-session-logs-"
 
   tags = merge(var.tags, {
     Name = "${var.cluster_name}-session-logs"
   })
 }
 
-resource "aws_s3_bucket_encryption" "session_logs" {
+resource "aws_s3_bucket_server_side_encryption_configuration" "session_logs" {
   count = var.enable_session_manager ? 1 : 0
 
   bucket = aws_s3_bucket.session_logs[0].id
@@ -203,6 +203,44 @@ resource "aws_ssm_parameter" "db_credentials" {
     Category = "Configuration"
   })
 }
+
+# ============================================================================
+# Workspace Credentials Management (NEW)
+# ============================================================================
+
+# Email configuration for SES
+resource "aws_ssm_parameter" "email_config" {
+  name        = "/${var.cluster_name}/email/config"
+  description = "Email configuration for employee notifications"
+  type        = "String"
+  value = jsonencode({
+    sender_email    = "noreply@innovatech.com"
+    sender_name     = "InnovaTech HR Portal"
+    ses_region      = data.aws_region.current.name
+    template_bucket = "email-templates"
+  })
+
+  tags = merge(var.tags, {
+    Category = "Configuration"
+    Service  = "Email"
+  })
+}
+
+# Workspace domain configuration
+resource "aws_ssm_parameter" "workspace_domain" {
+  name        = "/${var.cluster_name}/workspaces/domain"
+  description = "Public domain for workspace access"
+  type        = "String"
+  value       = var.workspace_domain
+
+  tags = merge(var.tags, {
+    Category = "Configuration"
+    Service  = "Workspaces"
+  })
+}
+
+# NOTE: Email templates are stored in application code (src/services/email.js)
+# SSM Parameter Store does not support {{}} template variables
 
 # ============================================================================
 # Patch Manager Configuration (Automated Updates)
@@ -343,7 +381,7 @@ resource "aws_ssm_association" "inventory_collection" {
 
 # IAM Role for Workspace Instances
 resource "aws_iam_role" "workspace_role" {
-  name_prefix = "${var.cluster_name}-workspace-"
+  name_prefix = "workspace-role-"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -393,9 +431,61 @@ resource "aws_iam_role_policy" "workspace_parameter_store" {
   })
 }
 
+# IAM Policy for HR Portal Backend to access SSM and SES
+resource "aws_iam_policy" "hr_portal_ssm_access" {
+  name_prefix = "${var.cluster_name}-hr-portal-ssm-"
+  description = "Allow HR Portal backend to manage workspace credentials in SSM and send emails via SES"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:PutParameter",
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:GetParametersByPath",
+          "ssm:DeleteParameter",
+          "ssm:AddTagsToResource"
+        ]
+        Resource = [
+          "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.cluster_name}/workspaces/*",
+          "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter/${var.cluster_name}/email/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:GenerateDataKey"
+        ]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "ssm.${data.aws_region.current.name}.amazonaws.com"
+          }
+        }
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = var.tags
+}
+
+
 # Instance Profile
 resource "aws_iam_instance_profile" "workspace" {
-  name_prefix = "${var.cluster_name}-workspace-"
+  name_prefix = "workspace-profile-"
   role        = aws_iam_role.workspace_role.name
 
   tags = var.tags
@@ -405,7 +495,7 @@ resource "aws_iam_instance_profile" "workspace" {
 resource "aws_iam_role" "maintenance_window" {
   count = var.enable_patch_manager ? 1 : 0
 
-  name_prefix = "${var.cluster_name}-mw-"
+  name_prefix = "maint-window-role-"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

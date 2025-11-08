@@ -197,6 +197,38 @@ async function deleteWorkspace(workspaceId) {
   }
 }
 
+async function updateWorkspace(workspaceId, updates) {
+  // Build UpdateExpression dynamically
+  const updateExpressions = [];
+  const expressionAttributeNames = {};
+  const expressionAttributeValues = {};
+  
+  Object.keys(updates).forEach((key, index) => {
+    const attributeName = `#attr${index}`;
+    const attributeValue = `:val${index}`;
+    updateExpressions.push(`${attributeName} = ${attributeValue}`);
+    expressionAttributeNames[attributeName] = key;
+    expressionAttributeValues[attributeValue] = updates[key];
+  });
+
+  const command = new UpdateCommand({
+    TableName: WORKSPACES_TABLE,
+    Key: { workspaceId },
+    UpdateExpression: `SET ${updateExpressions.join(', ')}`,
+    ExpressionAttributeNames: expressionAttributeNames,
+    ExpressionAttributeValues: expressionAttributeValues,
+    ReturnValues: 'ALL_NEW'
+  });
+
+  try {
+    const response = await docClient.send(command);
+    return response.Attributes;
+  } catch (error) {
+    logger.error('Error updating workspace:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   createEmployee,
   getEmployee,
@@ -204,6 +236,7 @@ module.exports = {
   getAllEmployees,
   updateEmployee,
   createWorkspace,
+  updateWorkspace,
   getWorkspaceByEmployee,
   getAllWorkspaces,
   deleteWorkspace

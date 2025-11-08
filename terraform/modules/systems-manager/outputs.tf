@@ -50,7 +50,14 @@ output "parameter_store_paths" {
     workspace_config = aws_ssm_parameter.workspace_config.name
     jwt_secret       = aws_ssm_parameter.jwt_secret.name
     db_credentials   = aws_ssm_parameter.db_credentials.name
+    email_config     = aws_ssm_parameter.email_config.name
+    workspace_domain = aws_ssm_parameter.workspace_domain.name
   }
+}
+
+output "hr_portal_ssm_policy_arn" {
+  description = "ARN of IAM policy for HR Portal SSM access"
+  value       = aws_iam_policy.hr_portal_ssm_access.arn
 }
 
 output "ssm_document_session_prefs" {

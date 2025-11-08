@@ -15,6 +15,8 @@
     "aws-sdk": "^2.1478.0",
     "@aws-sdk/client-dynamodb": "^3.450.0",
     "@aws-sdk/lib-dynamodb": "^3.450.0",
+    "@aws-sdk/client-ssm": "^3.450.0",
+    "@aws-sdk/client-ses": "^3.450.0",
     "@kubernetes/client-node": "^0.20.0",
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^9.0.2",

@@ -23,6 +23,11 @@ variable "dynamodb_workspaces_table_arn" {
   type        = string
 }
 
+variable "ssm_policy_arn" {
+  description = "ARN of the SSM Parameter Store policy for HR Portal"
+  type        = string
+}
+
 variable "environment" {
   description = "Environment name"
   type        = string

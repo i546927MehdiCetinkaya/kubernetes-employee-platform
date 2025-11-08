@@ -57,3 +57,9 @@ variable "patch_schedule" {
   type        = string
   default     = "cron(0 2 ? * SUN *)" # Every Sunday at 2 AM UTC
 }
+
+variable "workspace_domain" {
+  description = "Public domain for workspace Ingress URLs"
+  type        = string
+  default     = "workspaces.innovatech.example.com"
+}
