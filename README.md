@@ -1,124 +1,340 @@
-# InnovaTech Employee Lifecycle Platform# InnovaTech Case Study 3 - Employee Lifecycle Management# Employee Lifecycle Automation & Virtual Workspaces on AWS EKS
+# InnovaTech Employee Lifecycle Platform# InnovaTech Employee Lifecycle Platform# InnovaTech Employee Lifecycle Platform# InnovaTech Case Study 3 - Employee Lifecycle Management# Employee Lifecycle Automation & Virtual Workspaces on AWS EKS
 
 Automated employee onboarding system that provisions cloud workspaces and sends instant email credentials.
 
-
+Automated employee onboarding system that provisions cloud workspaces and sends instant email credentials.
 
 **📐 Architecture Diagram**: See [ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-> **Automated HR & Workspace Management op AWS met Terraform, EKS, en DynamoDB**## 🎯 Project Overview
+Automated employee onboarding system that provisions cloud workspaces and sends instant email credentials.
 
 ---
 
-
+**📐 Architecture Diagram**: See [ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## What is this?
 
-An automated HR platform that provisions dedicated cloud development workspaces for new employees within minutes. When HR creates an employee record, the system automatically deploys a containerized workspace and emails login credentials.Een volledig geautomatiseerd systeem voor employee onboarding waarbij nieuwe medewerkers automatisch een workspace krijgen toegewezen met SES email notificaties.**Innovatech Solutions** - End-to-End Employee Lifecycle Automation with Virtual Workspaces on AWS EKS using Zero Trust Architecture.
+A cloud-native HR platform that automatically creates dedicated development workspaces for new employees. When HR submits employee details, the system provisions a containerized VS Code environment and emails access credentials within minutes.
 
 
+
+------
+
+
+
+## The Problem**📐 Architecture Diagram**: See [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+Traditional onboarding requires manual server setup, VPN configuration, and software installation. This takes days and creates security risks through shared credentials and inconsistent environments.
+
+## What is this?
 
 ---
 
-
-
-## The Problem---This project delivers a fully automated employee lifecycle management solution that includes:
-
-Traditional employee onboarding requires manual infrastructure setup, VPN configuration, and software installation. This process takes days and creates security risks through shared credentials and inconsistent environments.
-
-- Automated employee onboarding and offboarding
-
----
-
-## 🚀 Quick Start- Virtual workspace provisioning (VS Code in browser)
+An automated HR platform that provisions dedicated cloud development workspaces for new employees within minutes. When HR creates an employee record, the system automatically deploys a containerized workspace and emails login credentials.> **Automated HR & Workspace Management op AWS met Terraform, EKS, en DynamoDB**## 🎯 Project Overview
 
 ## The Solution
 
-This system:- Zero Trust security architecture
+This system:
 
-- **Captures employee data** via React-based HR portal
+- Captures employee data via web portal
 
-- **Stores records** in DynamoDB with millisecond latency```powershell- Kubernetes-based infrastructure on AWS EKS
+- Stores records in DynamoDB------
 
-- **Provisions workspaces** using Kubernetes Jobs on EKS cluster
+- Provisions workspace pods on Kubernetes
 
-- **Configures routing** through AWS Load Balancer with unique subdomains# 1. Clone repository- Infrastructure as Code with Terraform
+- Configures LoadBalancer routing
 
-- **Sends credentials** automatically via AWS SES email service
+- Sends email with login credentials
 
-git clone https://github.com/i546927MehdiCetinkaya/casestudy3.git- DynamoDB for employee data storage
+## The Problem
 
 ---
 
-cd casestudy3- Secure VPC endpoints for private AWS service connectivity
+Traditional employee onboarding requires manual infrastructure setup, VPN configuration, and software installation. This process takes days and creates security risks through shared credentials and inconsistent environments.
 
 ## How Does It Work?
 
-```
+HR Portal → Backend API → DynamoDB → Kubernetes → Workspace Pod → Email Alert## What is this?
+
+
+
+**Ingress**: Validates employee form data  ---
+
+**Store**: Writes record to DynamoDB  
+
+**Provision**: Deploys workspace pod via Kubernetes Job  An automated HR platform that provisions dedicated cloud development workspaces for new employees within minutes. When HR creates an employee record, the system automatically deploys a containerized workspace and emails login credentials.Een volledig geautomatiseerd systeem voor employee onboarding waarbij nieuwe medewerkers automatisch een workspace krijgen toegewezen met SES email notificaties.**Innovatech Solutions** - End-to-End Employee Lifecycle Automation with Virtual Workspaces on AWS EKS using Zero Trust Architecture.
+
+**Route**: Updates LoadBalancer with employee subdomain  
+
+**Notify**: Sends credentials via SES email## The Solution
+
+
+
+---This system automatically handles the complete employee onboarding workflow:
+
+
+
+## Network Architecture
+
+- HR portal and workspaces run in EKS cluster on private subnets
+
+- Application LoadBalancer handles HTTPS traffic from internet**Employee Registration** - HR submits employee details via web portal  ---
+
+- VPC Endpoints provide private AWS service access
+
+- No NAT Gateway needed - all communication via VPC endpoints**Data Storage** - Employee record stored in DynamoDB  
+
+- No VPN needed - LoadBalancer publicly accessible via HTTPS
+
+**Workspace Provisioning** - Kubernetes deploys dedicated code-server pod  
+
+---
+
+**Network Configuration** - LoadBalancer routes traffic to employee subdomain  
+
+## Workspace Resources
+
+| Resource | Allocation |**Email Notification** - SES sends workspace URL and login credentials## The Problem---This project delivers a fully automated employee lifecycle management solution that includes:
+
+|----------|-----------|
+
+| CPU | 2 vCPU |
+
+| Memory | 4GB RAM |
+
+| Storage | 20GB persistent |---Traditional employee onboarding requires manual infrastructure setup, VPN configuration, and software installation. This process takes days and creates security risks through shared credentials and inconsistent environments.
+
+
+
+Each workspace includes VS Code, Git, Docker, and terminal access.
+
+
+
+---## Network Architecture- Automated employee onboarding and offboarding
+
+
+
+## Technology
+
+**AWS Services**:
+
+- EKS (Kubernetes cluster)The system runs entirely on AWS in a private VPC with isolated subnets:---
+
+- DynamoDB (employee database)
+
+- SES (email notifications)
+
+- ECR (container registry)
+
+- VPC (isolated networking)**Public Layer** - Application LoadBalancer handles HTTPS traffic from internet  ## 🚀 Quick Start- Virtual workspace provisioning (VS Code in browser)
+
+- CloudWatch (monitoring)
+
+**Private Layer** - EKS cluster hosts all application pods in isolated subnets  
+
+**Infrastructure**:
+
+- Terraform (IaC)**Data Layer** - DynamoDB stores employee records with millisecond latency  ## The Solution
+
+- GitHub Actions (CI/CD)
+
+**Email Layer** - SES sends automated credential emails to new employees  
+
+---
+
+**Storage Layer** - EBS volumes provide persistent storage per workspaceThis system:- Zero Trust security architecture
+
+## Deployment
+
+Fully automated via GitHub Actions on every push to main branch.
+
+
+
+---No VPN required - LoadBalancer is publicly accessible via HTTPS with security groups controlling access.- **Captures employee data** via React-based HR portal
+
+
+
+## Project Structure
+
+casestudy3/  
+
+├── applications/          # HR portal + workspace apps  ---- **Stores records** in DynamoDB with millisecond latency```powershell- Kubernetes-based infrastructure on AWS EKS
+
+├── terraform/            # Infrastructure as Code  
+
+├── kubernetes/           # K8s manifests  
+
+├── scripts/             # Helper scripts  
+
+└── .github/             # CI/CD workflows## What's Included- **Provisions workspaces** using Kubernetes Jobs on EKS cluster
+
+
+
+---
+
+
+
+## Academic Context**HR Portal Application**  - **Configures routing** through AWS Load Balancer with unique subdomains# 1. Clone repository- Infrastructure as Code with Terraform
+
+**Case Study 3** | Fontys University of Applied Sciences | Semester 3 | 2025
+
+React frontend for employee management with Node.js backend API
+
+Demonstrates cloud-native architecture, Infrastructure as Code, and container orchestration.
+
+- **Sends credentials** automatically via AWS SES email service
+
+**Student**: Mehdi Cetinkaya
+
+**Workspace System**  
+
+Containerized VS Code (code-server) instances with persistent storagegit clone https://github.com/i546927MehdiCetinkaya/casestudy3.git- DynamoDB for employee data storage
+
+
+
+**AWS Infrastructure**  ---
+
+EKS cluster, VPC networking, DynamoDB database, SES email service
+
+cd casestudy3- Secure VPC endpoints for private AWS service connectivity
+
+**Automation**  
+
+Terraform modules for infrastructure, Kubernetes manifests for applications## How Does It Work?
+
+
+
+**CI/CD Pipeline**  ```
+
+GitHub Actions workflow for automated deployment
 
 HR Portal → Backend API → DynamoDB → Kubernetes → Workspace Pod → Email Alert
 
+---
+
 ```# 2. Configureer AWS credentials## 📋 Table of Contents
 
+## Technology Stack
 
 
-**Ingress**: Validates employee form data  # Stel je AWS_ACCESS_KEY_ID en AWS_SECRET_ACCESS_KEY in
 
-**Store**: Writes employee record to DynamoDB  
+**Cloud Provider**: AWS (EKS, DynamoDB, VPC, SES, ECR, CloudWatch)  
 
-**Provision**: Triggers Kubernetes Job for workspace deployment  - [Features](#features)
+**Infrastructure**: Terraform with reusable modules  **Ingress**: Validates employee form data  # Stel je AWS_ACCESS_KEY_ID en AWS_SECRET_ACCESS_KEY in
 
-**Route**: Configures LoadBalancer with employee subdomain  
+**Orchestration**: Kubernetes 1.30 on managed EKS cluster  
+
+**Frontend**: React single-page application  **Store**: Writes employee record to DynamoDB  
+
+**Backend**: Node.js with Express REST API  
+
+**Database**: DynamoDB NoSQL for employee records  **Provision**: Triggers Kubernetes Job for workspace deployment  - [Features](#features)
+
+**Email**: AWS Simple Email Service  
+
+**Containers**: Docker images stored in ECR  **Route**: Configures LoadBalancer with employee subdomain  
+
+**Monitoring**: CloudWatch Logs and Container Insights
 
 **Notify**: Sends email with workspace URL and login info# 3. Deploy infrastructuur- [Architecture](#architecture)
 
+---
 
+
+
+## Workspace Features
 
 ---cd terraform- [Prerequisites](#prerequisites)
 
+Each employee receives a dedicated workspace with:
 
 
-## Network Architectureterraform init- [Quick Start](#quick-start)
 
-- **HR Portal** runs in dedicated Kubernetes namespace with React frontend + Node.js backend
+**Full VS Code Environment** - Browser-based development with extensions  
+
+**Persistent Storage** - 20GB home directory preserved across restarts  ## Network Architectureterraform init- [Quick Start](#quick-start)
+
+**Pre-configured Tools** - Git, Docker, and terminal access included  
+
+**Isolated Resources** - 2 vCPU and 4GB RAM per workspace  - **HR Portal** runs in dedicated Kubernetes namespace with React frontend + Node.js backend
+
+**Unique Access** - Personal subdomain with secure authentication
 
 - **Workspace Pods** run in isolated namespace with persistent storageterraform apply- [Deployment Guide](#deployment-guide)
 
+---
+
 - **Private Subnets** host all compute resources for security
+
+## Project Organization
 
 - **Public Subnets** contain Application Load Balancer for HTTPS traffic- [Usage](#usage)
 
-- **VPC Endpoints** provide direct AWS service communication (DynamoDB, SES, ECR)
+**applications/** - HR portal and workspace application source code  
 
-- **No VPN needed** - LoadBalancer publicly accessible via HTTPS with security groups# 4. Verkrijg cluster credentials  - [Getting Access Information](#getting-access-information)
+**terraform/** - Infrastructure as Code modules for AWS resources  - **VPC Endpoints** provide direct AWS service communication (DynamoDB, SES, ECR)
+
+**kubernetes/** - Manifest files for deployments and services  
+
+**scripts/** - Helper scripts for deployment and testing  - **No VPN needed** - LoadBalancer publicly accessible via HTTPS with security groups# 4. Verkrijg cluster credentials  - [Getting Access Information](#getting-access-information)
+
+**docs/** - Architecture documentation and diagrams  
+
+**.github/** - CI/CD workflow definitions
 
 
 
----aws eks update-kubeconfig --name innovatech-cluster --region eu-west-1  - [HR Portal Access](#hr-portal-access)
+------aws eks update-kubeconfig --name innovatech-cluster --region eu-west-1  - [HR Portal Access](#hr-portal-access)
 
 
 
-## Workspace Types  - [Employee Management](#-employee-management)
+## Deployment Model
 
-| Employee Role | Resources | Storage |
 
-|--------------|-----------|---------|# 5. Deploy applicaties  - [Workspace Access](#️-workspace-access)
 
-| Developer    | 2 vCPU, 4GB RAM | 20GB persistent |
+Infrastructure deployed via Terraform creates VPC, EKS cluster, DynamoDB table, and supporting AWS services. Applications deployed via Kubernetes manifests create pods, services, and ingress rules. GitHub Actions automates the entire deployment pipeline on every push to main branch.## Workspace Types  - [Employee Management](#-employee-management)
 
-| Designer     | 2 vCPU, 4GB RAM | 20GB persistent |kubectl apply -f ../kubernetes/  - [Monitoring & Operations](#-monitoring--operations)
 
-| Data Analyst | 2 vCPU, 4GB RAM | 20GB persistent |
 
-```  - [CI/CD Workflows](#-cicd-workflows)
+---| Employee Role | Resources | Storage |
 
-Each workspace includes:
 
-- VS Code (code-server) in browser  - [Security Operations](#️-security-operations)
 
-- Git pre-configured
+## Security Model|--------------|-----------|---------|# 5. Deploy applicaties  - [Workspace Access](#️-workspace-access)
 
-- Docker available---  - [Cost Monitoring](#-cost-monitoring)
+
+
+**Network Isolation** - All compute in private subnets with security groups  | Developer    | 2 vCPU, 4GB RAM | 20GB persistent |
+
+**Access Control** - Kubernetes RBAC and IAM roles for service accounts  
+
+**Secrets Management** - AWS Systems Manager Parameter Store for credentials  | Designer     | 2 vCPU, 4GB RAM | 20GB persistent |kubectl apply -f ../kubernetes/  - [Monitoring & Operations](#-monitoring--operations)
+
+**Encryption** - Data encrypted at rest in DynamoDB and EBS volumes  
+
+**Monitoring** - CloudWatch alarms for suspicious activity| Data Analyst | 2 vCPU, 4GB RAM | 20GB persistent |
+
+
+
+---```  - [CI/CD Workflows](#-cicd-workflows)
+
+
+
+## Academic ContextEach workspace includes:
+
+
+
+**Case Study 3** | Fontys University of Applied Sciences | Semester 3 | 2025- VS Code (code-server) in browser  - [Security Operations](#️-security-operations)
+
+
+
+Demonstrates cloud-native architecture, Infrastructure as Code, container orchestration, and DevOps automation principles.- Git pre-configured
+
+
+
+**Student**: Mehdi Cetinkaya  - Docker available---  - [Cost Monitoring](#-cost-monitoring)
+
+**Repository**: https://github.com/i546927MehdiCetinkaya/casestudy3
 
 - Terminal access
 
