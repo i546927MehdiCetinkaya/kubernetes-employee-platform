@@ -1,160 +1,318 @@
-# InnovaTech Case Study 3 - Employee Lifecycle Management# Employee Lifecycle Automation & Virtual Workspaces on AWS EKS
+# InnovaTech Employee Lifecycle Platform# InnovaTech Case Study 3 - Employee Lifecycle Management# Employee Lifecycle Automation & Virtual Workspaces on AWS EKS
+
+Automated employee onboarding system that provisions cloud workspaces and sends instant email credentials.
 
 
+
+**📐 Architecture Diagram**: See [ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 > **Automated HR & Workspace Management op AWS met Terraform, EKS, en DynamoDB**## 🎯 Project Overview
 
-
-
-Een volledig geautomatiseerd systeem voor employee onboarding waarbij nieuwe medewerkers automatisch een workspace krijgen toegewezen met SES email notificaties.**Innovatech Solutions** - End-to-End Employee Lifecycle Automation with Virtual Workspaces on AWS EKS using Zero Trust Architecture.
+---
 
 
 
----This project delivers a fully automated employee lifecycle management solution that includes:
+## What is this?
+
+An automated HR platform that provisions dedicated cloud development workspaces for new employees within minutes. When HR creates an employee record, the system automatically deploys a containerized workspace and emails login credentials.Een volledig geautomatiseerd systeem voor employee onboarding waarbij nieuwe medewerkers automatisch een workspace krijgen toegewezen met SES email notificaties.**Innovatech Solutions** - End-to-End Employee Lifecycle Automation with Virtual Workspaces on AWS EKS using Zero Trust Architecture.
+
+
+
+---
+
+
+
+## The Problem---This project delivers a fully automated employee lifecycle management solution that includes:
+
+Traditional employee onboarding requires manual infrastructure setup, VPN configuration, and software installation. This process takes days and creates security risks through shared credentials and inconsistent environments.
 
 - Automated employee onboarding and offboarding
 
+---
+
 ## 🚀 Quick Start- Virtual workspace provisioning (VS Code in browser)
 
-- Zero Trust security architecture
+## The Solution
 
-```powershell- Kubernetes-based infrastructure on AWS EKS
+This system:- Zero Trust security architecture
 
-# 1. Clone repository- Infrastructure as Code with Terraform
+- **Captures employee data** via React-based HR portal
+
+- **Stores records** in DynamoDB with millisecond latency```powershell- Kubernetes-based infrastructure on AWS EKS
+
+- **Provisions workspaces** using Kubernetes Jobs on EKS cluster
+
+- **Configures routing** through AWS Load Balancer with unique subdomains# 1. Clone repository- Infrastructure as Code with Terraform
+
+- **Sends credentials** automatically via AWS SES email service
 
 git clone https://github.com/i546927MehdiCetinkaya/casestudy3.git- DynamoDB for employee data storage
 
+---
+
 cd casestudy3- Secure VPC endpoints for private AWS service connectivity
 
+## How Does It Work?
+
+```
+
+HR Portal → Backend API → DynamoDB → Kubernetes → Workspace Pod → Email Alert
+
+```# 2. Configureer AWS credentials## 📋 Table of Contents
 
 
-# 2. Configureer AWS credentials## 📋 Table of Contents
 
-# Stel je AWS_ACCESS_KEY_ID en AWS_SECRET_ACCESS_KEY in
+**Ingress**: Validates employee form data  # Stel je AWS_ACCESS_KEY_ID en AWS_SECRET_ACCESS_KEY in
 
-- [Features](#features)
+**Store**: Writes employee record to DynamoDB  
 
-# 3. Deploy infrastructuur- [Architecture](#architecture)
+**Provision**: Triggers Kubernetes Job for workspace deployment  - [Features](#features)
 
-cd terraform- [Prerequisites](#prerequisites)
+**Route**: Configures LoadBalancer with employee subdomain  
 
-terraform init- [Quick Start](#quick-start)
+**Notify**: Sends email with workspace URL and login info# 3. Deploy infrastructuur- [Architecture](#architecture)
 
-terraform apply- [Deployment Guide](#deployment-guide)
 
-- [Usage](#usage)
 
-# 4. Verkrijg cluster credentials  - [Getting Access Information](#getting-access-information)
+---cd terraform- [Prerequisites](#prerequisites)
 
-aws eks update-kubeconfig --name innovatech-cluster --region eu-west-1  - [HR Portal Access](#hr-portal-access)
 
-  - [Employee Management](#-employee-management)
 
-# 5. Deploy applicaties  - [Workspace Access](#️-workspace-access)
+## Network Architectureterraform init- [Quick Start](#quick-start)
 
-kubectl apply -f ../kubernetes/  - [Monitoring & Operations](#-monitoring--operations)
+- **HR Portal** runs in dedicated Kubernetes namespace with React frontend + Node.js backend
+
+- **Workspace Pods** run in isolated namespace with persistent storageterraform apply- [Deployment Guide](#deployment-guide)
+
+- **Private Subnets** host all compute resources for security
+
+- **Public Subnets** contain Application Load Balancer for HTTPS traffic- [Usage](#usage)
+
+- **VPC Endpoints** provide direct AWS service communication (DynamoDB, SES, ECR)
+
+- **No VPN needed** - LoadBalancer publicly accessible via HTTPS with security groups# 4. Verkrijg cluster credentials  - [Getting Access Information](#getting-access-information)
+
+
+
+---aws eks update-kubeconfig --name innovatech-cluster --region eu-west-1  - [HR Portal Access](#hr-portal-access)
+
+
+
+## Workspace Types  - [Employee Management](#-employee-management)
+
+| Employee Role | Resources | Storage |
+
+|--------------|-----------|---------|# 5. Deploy applicaties  - [Workspace Access](#️-workspace-access)
+
+| Developer    | 2 vCPU, 4GB RAM | 20GB persistent |
+
+| Designer     | 2 vCPU, 4GB RAM | 20GB persistent |kubectl apply -f ../kubernetes/  - [Monitoring & Operations](#-monitoring--operations)
+
+| Data Analyst | 2 vCPU, 4GB RAM | 20GB persistent |
 
 ```  - [CI/CD Workflows](#-cicd-workflows)
 
-  - [Security Operations](#️-security-operations)
+Each workspace includes:
 
----  - [Cost Monitoring](#-cost-monitoring)
+- VS Code (code-server) in browser  - [Security Operations](#️-security-operations)
 
-- [Security](#security)
+- Git pre-configured
 
-## 📋 Wat doet dit systeem?- [Cost Management](#cost-management)
+- Docker available---  - [Cost Monitoring](#-cost-monitoring)
 
-- [Testing](#testing)
+- Terminal access
 
-Dit project implementeert een **geautomatiseerde employee lifecycle management** oplossing:- [Troubleshooting](#troubleshooting)
+- Persistent home directory- [Security](#security)
 
-- [Quick Reference](#-quick-reference)
 
-1. **HR Portal**: Webapplicatie waar HR nieuwe medewerkers kan aanmaken- [FAQ](#-faq)
 
-2. **Automatische Workspace**: Elk nieuwe medewerker krijgt automatisch een eigen code-server workspace- [Contributing](#contributing)
+---## 📋 Wat doet dit systeem?- [Cost Management](#cost-management)
+
+
+
+## Technology- [Testing](#testing)
+
+
+
+**AWS Cloud Native**:Dit project implementeert een **geautomatiseerde employee lifecycle management** oplossing:- [Troubleshooting](#troubleshooting)
+
+- **EKS** (managed Kubernetes cluster)
+
+- **DynamoDB** (employee database)- [Quick Reference](#-quick-reference)
+
+- **SES** (email notifications)
+
+- **ECR** (container registry)1. **HR Portal**: Webapplicatie waar HR nieuwe medewerkers kan aanmaken- [FAQ](#-faq)
+
+- **VPC** (isolated networking)
+
+- **Systems Manager** (parameter store)2. **Automatische Workspace**: Elk nieuwe medewerker krijgt automatisch een eigen code-server workspace- [Contributing](#contributing)
+
+- **CloudWatch** (logs and metrics)
 
 3. **Email Notificatie**: SES stuurt automatisch login credentials naar de medewerker
 
-4. **Cloud Native**: Draait volledig op AWS EKS met Kubernetes orchestratie---
+**Infrastructure**:
+
+- **Terraform** (Infrastructure as Code)4. **Cloud Native**: Draait volledig op AWS EKS met Kubernetes orchestratie---
+
+- **GitHub Actions** (CI/CD pipeline)
+
+- **Docker** (containerization)
 
 
 
----## 🎬 Getting Started Tutorial
+**Application Stack**:---## 🎬 Getting Started Tutorial
 
+- **React** (frontend UI)
 
+- **Node.js + Express** (backend API)
+
+- **code-server** (VS Code in browser)
 
 ## 🏗️ Architectuur### 5-Minute Quickstart
 
+---
 
+
+
+## Deployment
 
 Zie [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) voor een gedetailleerd overzicht van de infrastructuur en componenten.**1. Deploy via GitHub Actions (Easiest)**
 
+Fully automated via **GitHub Actions** on every push to `main` branch.
+
 ```bash
 
-**Hoofdcomponenten:**# Fork this repo, then:
+### Manual Deployment
 
-- **AWS EKS**: Kubernetes cluster voor container orchestratiegit clone https://github.com/YOUR-USERNAME/casestudy3.git
+```bash**Hoofdcomponenten:**# Fork this repo, then:
+
+# 1. Clone repository
+
+git clone https://github.com/i546927MehdiCetinkaya/casestudy3.git- **AWS EKS**: Kubernetes cluster voor container orchestratiegit clone https://github.com/YOUR-USERNAME/casestudy3.git
+
+cd casestudy3
 
 - **DynamoDB**: NoSQL database voor employee datacd casestudy3
 
-- **ECR**: Container registry voor Docker imagesgit add .
+# 2. Configure AWS credentials
 
-- **VPC**: Geïsoleerd netwerk met private/public subnetsgit commit --allow-empty -m "Trigger deployment"
+export AWS_ACCESS_KEY_ID="your-key"- **ECR**: Container registry voor Docker imagesgit add .
 
-- **SES**: Email service voor automated notificatiesgit push origin main
+export AWS_SECRET_ACCESS_KEY="your-secret"
 
-- **Systems Manager**: Parameter store voor configuratie
+export AWS_DEFAULT_REGION="eu-west-1"- **VPC**: Geïsoleerd netwerk met private/public subnetsgit commit --allow-empty -m "Trigger deployment"
+
+
+
+# 3. Deploy infrastructure- **SES**: Email service voor automated notificatiesgit push origin main
+
+cd terraform
+
+terraform init- **Systems Manager**: Parameter store voor configuratie
+
+terraform apply -auto-approve
 
 # Monitor
 
----gh run watch
+# 4. Configure kubectl
+
+aws eks update-kubeconfig --name innovatech-cluster --region eu-west-1---gh run watch
+
+
+
+# 5. Deploy applications```
+
+cd ..
+
+kubectl apply -f kubernetes/## 📁 Project Structuur
+
+
+
+# 6. Get LoadBalancer URL**2. Access Your Infrastructure**
+
+kubectl get svc -n hr-portal
+
+`````````bash
+
+
+
+---casestudy3/# Configure kubectl
+
+
+
+## Project Structure├── applications/          # Applicatie codeaws eks update-kubeconfig --region eu-west-1 --name innovatech-employee-lifecycle
 
 ```
 
-## 📁 Project Structuur
+casestudy3/│   ├── hr-portal/        # HR management frontend + backend
 
-**2. Access Your Infrastructure**
+├── applications/          # Application source code
 
-``````bash
+│   ├── hr-portal/        # React frontend + Node.js backend│   └── workspace/        # Code-server workspace configuratie# Check status
 
-casestudy3/# Configure kubectl
+│   └── workspace/        # code-server configuration
 
-├── applications/          # Applicatie codeaws eks update-kubeconfig --region eu-west-1 --name innovatech-employee-lifecycle
+├── terraform/            # Infrastructure as Code├── terraform/            # Infrastructure as Codekubectl get pods --all-namespaces
 
-│   ├── hr-portal/        # HR management frontend + backend
+│   └── modules/         # Reusable Terraform modules
 
-│   └── workspace/        # Code-server workspace configuratie# Check status
+├── kubernetes/           # Kubernetes manifests│   └── modules/         # Herbruikbare Terraform modules
 
-├── terraform/            # Infrastructure as Codekubectl get pods --all-namespaces
+├── scripts/             # Deployment and helper scripts
 
-│   └── modules/         # Herbruikbare Terraform modules
+├── docs/                # Architecture documentation├── kubernetes/           # K8s manifests# Get API URL
 
-├── kubernetes/           # K8s manifests# Get API URL
+└── .github/             # CI/CD workflows
 
-├── scripts/             # Helper scripts voor deploymentkubectl get ingress -n hr-portal
+```├── scripts/             # Helper scripts voor deploymentkubectl get ingress -n hr-portal
 
-└── docs/                # Documentatie```
 
-```
 
-**3. Create Your First Employee**
+---└── docs/                # Documentatie```
 
----```bash
 
-export API_URL="http://$(kubectl get ingress hr-portal-ingress -n hr-portal -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
 
-## 🔑 Belangrijke Features
+## Key Features```
+
+
+
+✅ **Zero-touch provisioning** - Automated from employee creation to workspace access  **3. Create Your First Employee**
+
+✅ **Self-service HR portal** - No technical knowledge required  
+
+✅ **Isolated workspaces** - Each employee gets dedicated pod with persistent storage  ---```bash
+
+✅ **Email automation** - SES sends credentials automatically  
+
+✅ **Scalable infrastructure** - Auto-scaling based on load  export API_URL="http://$(kubectl get ingress hr-portal-ingress -n hr-portal -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+
+✅ **Cost optimized** - Pay-per-use with DynamoDB and EKS spot instances  
+
+✅ **GitOps ready** - Infrastructure and apps version controlled  ## 🔑 Belangrijke Features
+
+✅ **Observable** - CloudWatch integration for monitoring
 
 curl -X POST $API_URL/api/employees \
 
+---
+
 ### ✅ Volledig Geautomatiseerd  -H "Content-Type: application/json" \
+
+## Academic Context
 
 - Infrastructure as Code met Terraform  -d '{
 
-- GitOps deployment workflow    "firstName": "Jane",
+**Case Study 3** | Fontys University of Applied Sciences | Semester 3 | 2025  
 
-- Automatische DNS en LoadBalancer configuratie    "lastName": "Smith",
+Demonstrates cloud-native architecture, Infrastructure as Code, container orchestration, and DevOps automation.- GitOps deployment workflow    "firstName": "Jane",
+
+
+
+**Student**: Mehdi Cetinkaya  - Automatische DNS en LoadBalancer configuratie    "lastName": "Smith",
+
+**Repository**: https://github.com/i546927MehdiCetinkaya/casestudy3
 
     "email": "jane.smith@innovatech.com",
 
