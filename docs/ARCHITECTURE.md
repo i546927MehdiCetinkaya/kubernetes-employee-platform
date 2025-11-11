@@ -51,6 +51,85 @@ flowchart TB
 
 ---
 
+## AWS Network Architecture
+
+```mermaid
+flowchart TB
+    Internet((Internet))
+    
+    subgraph VPC["VPC: 10.0.0.0/16"]
+        subgraph AZ1["Availability Zone 1"]
+            subgraph PubSub1["Public Subnet 10.0.1.0/24"]
+                IGW[Internet Gateway]
+                ALB1[ALB<br/>Target Group 1]
+                NAT1[NAT Gateway<br/>Elastic IP]
+            end
+            
+            subgraph PrivSub1["Private Subnet 10.0.101.0/24"]
+                EKS1[EKS Node Group<br/>Worker Nodes]
+                POD1[Pods<br/>hr-portal + workspaces]
+            end
+        end
+        
+        subgraph AZ2["Availability Zone 2"]
+            subgraph PubSub2["Public Subnet 10.0.2.0/24"]
+                ALB2[ALB<br/>Target Group 2]
+                NAT2[NAT Gateway<br/>Elastic IP]
+            end
+            
+            subgraph PrivSub2["Private Subnet 10.0.102.0/24"]
+                EKS2[EKS Node Group<br/>Worker Nodes]
+                POD2[Pods<br/>hr-portal + workspaces]
+            end
+        end
+        
+        subgraph Endpoints["VPC Endpoints - PrivateLink"]
+            VPCe_DDB[DynamoDB<br/>Gateway Endpoint]
+            VPCe_ECR[ECR API<br/>Interface Endpoint]
+            VPCe_ECR_DKR[ECR DKR<br/>Interface Endpoint]
+            VPCe_SES[SES<br/>Interface Endpoint]
+            VPCe_S3[S3<br/>Gateway Endpoint]
+        end
+    end
+    
+    subgraph AWS_Services["AWS Managed Services"]
+        DDB[(DynamoDB)]
+        ECR[ECR Registry]
+        SES[Simple Email Service]
+        S3[S3 Buckets]
+    end
+    
+    Internet -->|HTTPS| IGW
+    IGW --> ALB1
+    IGW --> ALB2
+    ALB1 --> POD1
+    ALB2 --> POD2
+    
+    POD1 -->|Outbound Internet| NAT1
+    POD2 -->|Outbound Internet| NAT2
+    NAT1 --> IGW
+    NAT2 --> IGW
+    
+    POD1 -.->|Private| VPCe_DDB
+    POD2 -.->|Private| VPCe_DDB
+    VPCe_DDB -.-> DDB
+    
+    POD1 -.->|Private| VPCe_ECR
+    POD2 -.->|Private| VPCe_ECR_DKR
+    VPCe_ECR -.-> ECR
+    VPCe_ECR_DKR -.-> ECR
+    
+    POD1 -.->|Private| VPCe_SES
+    POD2 -.->|Private| VPCe_SES
+    VPCe_SES -.-> SES
+    
+    EKS1 -.->|Private| VPCe_S3
+    EKS2 -.->|Private| VPCe_S3
+    VPCe_S3 -.-> S3
+```
+
+---
+
 ## Data Flow
 
 ```mermaid
