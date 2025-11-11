@@ -3,15 +3,50 @@
 ## System Architecture
 
 ```mermaid
-flowchart LR
-    HR[HR Staff] --> LB[Load Balancer]
-    EMP[Employee] --> LB
-    LB --> FE[Frontend]
-    FE --> BE[Backend API]
-    BE --> DB[(DynamoDB)]
-    BE --> SES[AWS SES]
-    BE --> K8S[Kubernetes]
-    K8S --> WS[Workspace Pods]
+flowchart TB
+    subgraph Users
+        HR[HR Staff]
+        EMP[Employee]
+    end
+    
+    subgraph AWS["AWS Cloud"]
+        subgraph Public["Public Subnet"]
+            LB[Application Load Balancer]
+        end
+        
+        subgraph Private["Private Subnet - EKS Cluster"]
+            subgraph HR_NS["Namespace: hr-portal"]
+                FE[Frontend<br/>React + Nginx]
+                BE[Backend API<br/>Node.js + Express]
+            end
+            
+            subgraph WS_NS["Namespace: workspaces"]
+                WS1[Workspace Pod 1<br/>VSCode Server]
+                WS2[Workspace Pod 2<br/>VSCode Server]
+                WS3[Workspace Pod N<br/>VSCode Server]
+            end
+        end
+        
+        subgraph Services["AWS Services"]
+            DB[(DynamoDB<br/>Employee Data)]
+            SES[AWS SES<br/>Email Service]
+            ECR[ECR<br/>Container Images]
+        end
+    end
+    
+    HR -->|HTTPS| LB
+    EMP -->|HTTPS| LB
+    LB -->|Route /| FE
+    LB -->|Route /api| BE
+    FE -->|API Calls| BE
+    BE -->|Store/Retrieve| DB
+    BE -->|Send Email| SES
+    BE -->|Create Pod| WS_NS
+    LB -->|Route /workspace/:id| WS1
+    LB -->|Route /workspace/:id| WS2
+    LB -->|Route /workspace/:id| WS3
+    HR_NS -.->|Pull Images| ECR
+    WS_NS -.->|Pull Images| ECR
 ```
 
 ---
