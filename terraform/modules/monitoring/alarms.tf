@@ -3,7 +3,7 @@
 # SNS Topic for Alerts
 resource "aws_sns_topic" "alerts" {
   name = "${var.cluster_name}-alerts"
-  
+
   tags = {
     Name        = "${var.cluster_name}-alerts"
     Environment = var.environment
@@ -29,7 +29,7 @@ resource "aws_cloudwatch_metric_alarm" "cluster_failed_nodes" {
   threshold           = 0
   alarm_description   = "Alert when EKS cluster has failed nodes"
   alarm_actions       = [aws_sns_topic.alerts.arn]
-  
+
   dimensions = {
     ClusterName = var.cluster_name
   }
@@ -248,7 +248,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           stat   = "Average"
           region = var.aws_region
           title  = "EKS Cluster Health"
-          yAxis = { left = { min = 0 } }
+          yAxis  = { left = { min = 0 } }
         }
         width  = 12
         height = 6
@@ -264,7 +264,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           stat   = "Average"
           region = var.aws_region
           title  = "Node Resource Utilization"
-          yAxis = { left = { min = 0, max = 100 } }
+          yAxis  = { left = { min = 0, max = 100 } }
         }
         width  = 12
         height = 6
@@ -296,7 +296,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           stat   = "Sum"
           region = var.aws_region
           title  = "Application Errors"
-          yAxis = { left = { min = 0 } }
+          yAxis  = { left = { min = 0 } }
         }
         width  = 12
         height = 6
@@ -304,9 +304,9 @@ resource "aws_cloudwatch_dashboard" "main" {
       {
         type = "log"
         properties = {
-          query   = "SOURCE '${aws_cloudwatch_log_group.cluster.name}' | fields @timestamp, @message | filter @message like /ERROR/ | sort @timestamp desc | limit 20"
-          region  = var.aws_region
-          title   = "Recent Error Logs"
+          query  = "SOURCE '${aws_cloudwatch_log_group.cluster.name}' | fields @timestamp, @message | filter @message like /ERROR/ | sort @timestamp desc | limit 20"
+          region = var.aws_region
+          title  = "Recent Error Logs"
         }
         width  = 24
         height = 6
