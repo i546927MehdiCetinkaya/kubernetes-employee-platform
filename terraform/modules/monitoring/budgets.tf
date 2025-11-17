@@ -1,6 +1,7 @@
 # AWS Budgets for Cost Management
 
 resource "aws_budgets_budget" "monthly_cost" {
+  count             = length(var.budget_alert_emails) > 0 ? 1 : 0
   name              = "${var.cluster_name}-monthly-budget"
   budget_type       = "COST"
   limit_amount      = var.monthly_budget_limit
@@ -40,6 +41,7 @@ resource "aws_budgets_budget" "monthly_cost" {
 
 # Budget for EKS-specific costs
 resource "aws_budgets_budget" "eks_cost" {
+  count             = length(var.budget_alert_emails) > 0 ? 1 : 0
   name              = "${var.cluster_name}-eks-budget"
   budget_type       = "COST"
   limit_amount      = var.eks_budget_limit
@@ -63,6 +65,7 @@ resource "aws_budgets_budget" "eks_cost" {
 
 # Budget for DynamoDB costs
 resource "aws_budgets_budget" "dynamodb_cost" {
+  count             = length(var.budget_alert_emails) > 0 ? 1 : 0
   name              = "${var.cluster_name}-dynamodb-budget"
   budget_type       = "COST"
   limit_amount      = var.dynamodb_budget_limit
