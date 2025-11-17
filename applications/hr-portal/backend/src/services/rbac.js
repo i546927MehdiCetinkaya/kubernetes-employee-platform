@@ -1,6 +1,9 @@
 // RBAC Service - Permission checks per department
-const AWS = require('aws-sdk');
-const dynamodb = new AWS.DynamoDB.DocumentClient();
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, GetCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
+
+const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'eu-west-1' });
+const dynamodb = DynamoDBDocumentClient.from(client);
 
 const ROLES = {
   ADMIN: 'admin',
@@ -201,7 +204,7 @@ async function getEmployee(employeeId) {
     Key: { employeeId }
   };
 
-  const result = await dynamodb.get(params).promise();
+  const result = await dynamodb.send(new GetCommand(params));
   return result.Item;
 }
 
@@ -222,7 +225,7 @@ async function getEmployeesByDepartment(currentEmployee) {
 
   // Admin can see all
   if (currentEmployee.role === ROLES.ADMIN) {
-    const result = await dynamodb.scan(params).promise();
+    const result = await dynamodb.send(new ScanCommand(params));
     return result.Items;
   }
 
@@ -232,8 +235,25 @@ async function getEmployeesByDepartment(currentEmployee) {
     ':dept': currentEmployee.department
   };
 
-  const result = await dynamodb.scan(params).promise();
+  const result = await dynamodb.send(new ScanCommand(params));
   return result.Items;
+}
+
+/**
+ * Get allowed departments for employee based on role
+ */
+function getAllowedDepartments(employee) {
+  const permissions = PERMISSIONS[employee.role];
+  
+  if (permissions.departments.includes('*')) {
+    return ['all'];
+  }
+  
+  if (permissions.departments.includes('own')) {
+    return [employee.department];
+  }
+  
+  return [];
 }
 
 /**
@@ -273,5 +293,6 @@ module.exports = {
   PERMISSIONS,
   checkPermission,
   getEmployeesByDepartment,
+  getAllowedDepartments,
   requirePermission
 };

@@ -1,0 +1,13 @@
+{
+  "testEnvironment": "node",
+  "coverageDirectory": "./coverage",
+  "collectCoverageFrom": [
+    "applications/hr-portal/backend/src/**/*.js",
+    "!applications/hr-portal/backend/src/index.js"
+  ],
+  "testMatch": [
+    "**/tests/**/*.test.js"
+  ],
+  "verbose": true,
+  "testTimeout": 10000
+}

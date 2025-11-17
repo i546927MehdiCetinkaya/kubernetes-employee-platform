@@ -10,24 +10,5 @@ resource "aws_cloudwatch_log_group" "cluster" {
   }
 }
 
-resource "aws_cloudwatch_dashboard" "main" {
-  dashboard_name = "${var.cluster_name}-dashboard"
+# Note: Dashboard and alarms are defined in alarms.tf
 
-  dashboard_body = jsonencode({
-    widgets = [
-      {
-        type = "metric"
-        properties = {
-          metrics = [
-            ["AWS/EKS", "cluster_failed_node_count", { stat = "Average" }],
-            [".", "cluster_node_count", { stat = "Average" }]
-          ]
-          period = 300
-          stat   = "Average"
-          region = "eu-west-1"
-          title  = "EKS Cluster Nodes"
-        }
-      }
-    ]
-  })
-}

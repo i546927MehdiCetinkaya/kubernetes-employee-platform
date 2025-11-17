@@ -171,8 +171,12 @@ module "ecr" {
 module "monitoring" {
   source = "./modules/monitoring"
 
-  cluster_name = var.cluster_name
-  environment  = var.environment
+  cluster_name           = var.cluster_name
+  environment            = var.environment
+  aws_region             = var.aws_region
+  alert_email            = var.alert_email
+  monthly_budget_limit   = var.monthly_budget_limit
+  budget_alert_emails    = var.budget_alert_emails
 
   depends_on = [module.eks]
 }

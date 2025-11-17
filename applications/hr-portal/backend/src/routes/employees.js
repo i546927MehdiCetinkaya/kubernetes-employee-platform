@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const dynamodbService = require('../services/dynamodb');
 const workspaceService = require('../services/workspace');
 const rbacService = require('../services/rbac');
+const emailService = require('../services/email');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -91,10 +92,26 @@ router.post('/',
       await dynamodbService.createEmployee(employee);
       logger.info(`Employee created: ${employeeId}`);
 
-      // Provision workspace asynchronously
+      // Provision workspace and send email asynchronously
       workspaceService.provisionWorkspace(employee)
-        .then(workspace => {
+        .then(async workspace => {
           logger.info(`Workspace provisioned for employee ${employeeId}: ${workspace.workspaceId}`);
+          
+          // Generate temporary password for workspace
+          const temporaryPassword = generateTemporaryPassword();
+          
+          // Send welcome email with credentials
+          try {
+            const emailResult = await emailService.sendWelcomeEmail(
+              employee,
+              workspace,
+              temporaryPassword
+            );
+            logger.info(`Welcome email sent to ${employee.email}: ${emailResult.messageId}`);
+          } catch (emailError) {
+            logger.error(`Failed to send welcome email to ${employee.email}:`, emailError);
+            // Don't fail the request if email fails - credentials still shown in UI
+          }
         })
         .catch(error => {
           logger.error(`Failed to provision workspace for ${employeeId}:`, error);
@@ -102,7 +119,7 @@ router.post('/',
 
       res.status(201).json({ 
         employee,
-        message: 'Employee created successfully. Workspace provisioning in progress.'
+        message: 'Employee created successfully. Workspace provisioning in progress. Welcome email will be sent shortly.'
       });
     } catch (error) {
       next(error);
@@ -161,6 +178,21 @@ router.delete('/:id', async (req, res, next) => {
       updatedAt: new Date().toISOString()
     });
 
+    // Send termination notification email
+    const terminationDate = new Date();
+    terminationDate.setDate(terminationDate.getDate() + 7); // 7 days notice
+    
+    try {
+      await emailService.sendWorkspaceTerminationEmail(
+        employee,
+        terminationDate.toLocaleDateString()
+      );
+      logger.info(`Termination email sent to ${employee.email}`);
+    } catch (emailError) {
+      logger.error(`Failed to send termination email to ${employee.email}:`, emailError);
+      // Continue with deprovisioning even if email fails
+    }
+
     // Deprovision workspace asynchronously
     workspaceService.deprovisionWorkspace(req.params.id)
       .then(() => {
@@ -171,10 +203,22 @@ router.delete('/:id', async (req, res, next) => {
       });
 
     logger.info(`Employee offboarded: ${req.params.id}`);
-    res.json({ message: 'Employee offboarded successfully. Workspace deprovisioning in progress.' });
+    res.json({ message: 'Employee offboarded successfully. Termination email sent. Workspace deprovisioning in progress.' });
   } catch (error) {
     next(error);
   }
 });
+
+/**
+ * Generate a secure temporary password
+ */
+function generateTemporaryPassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  let password = '';
+  for (let i = 0; i < 16; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+}
 
 module.exports = router;

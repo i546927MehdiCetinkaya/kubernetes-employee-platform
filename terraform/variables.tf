@@ -89,3 +89,21 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "alert_email" {
+  description = "Email address for CloudWatch alarm notifications"
+  type        = string
+  default     = ""
+}
+
+variable "monthly_budget_limit" {
+  description = "Monthly budget limit in USD"
+  type        = number
+  default     = 300
+}
+
+variable "budget_alert_emails" {
+  description = "List of email addresses for budget alerts"
+  type        = list(string)
+  default     = []
+}
