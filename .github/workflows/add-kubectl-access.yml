@@ -1,0 +1,97 @@
+name: Add kubectl Access
+
+on:
+  workflow_dispatch:
+    inputs:
+      roleArn:
+        description: 'AWS IAM Role ARN to add (e.g., arn:aws:iam::920120424621:role/AWSReservedSSO_fictisb_IsbUsersPS_2f9b7e07b8441d9f)'
+        required: true
+        type: string
+      username:
+        description: 'Kubernetes username (default: admin)'
+        required: false
+        default: 'admin'
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  add-access:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::920120424621:role/githubrepo
+          aws-region: eu-west-1
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region eu-west-1 --name innovatech-employee-lifecycle
+
+      - name: Get current aws-auth ConfigMap
+        id: get-auth
+        run: |
+          if kubectl get configmap aws-auth -n kube-system -o yaml > /tmp/current-aws-auth.yaml 2>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            cat /tmp/current-aws-auth.yaml
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "aws-auth ConfigMap does not exist, will create new one"
+          fi
+
+      - name: Create/Update aws-auth ConfigMap
+        run: |
+          cat > /tmp/aws-auth-patch.yaml <<EOF
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: aws-auth
+            namespace: kube-system
+          data:
+            mapRoles: |
+              - rolearn: arn:aws:iam::920120424621:role/eks-node-group-role
+                username: system:node:{{EC2PrivateDNSName}}
+                groups:
+                  - system:bootstrappers
+                  - system:nodes
+              - rolearn: ${{ github.event.inputs.roleArn }}
+                username: ${{ github.event.inputs.username }}:{{SessionName}}
+                groups:
+                  - system:masters
+          EOF
+
+          echo "Applying aws-auth ConfigMap..."
+          cat /tmp/aws-auth-patch.yaml
+          kubectl apply -f /tmp/aws-auth-patch.yaml
+
+      - name: Verify access was added
+        run: |
+          echo "Current aws-auth ConfigMap:"
+          kubectl get configmap aws-auth -n kube-system -o yaml
+          
+          echo ""
+          echo "✅ Access added successfully!"
+          echo "You can now use kubectl locally with your AWS SSO credentials"
+          echo ""
+          echo "Test with: kubectl get pods -A"
+
+      - name: Get cluster info
+        run: |
+          echo ""
+          echo "=== Cluster Status ==="
+          kubectl cluster-info
+          echo ""
+          echo "=== All Pods ==="
+          kubectl get pods -A
+          echo ""
+          echo "=== HR Portal Pods ==="
+          kubectl get pods -n hr-portal -o wide || echo "No pods in hr-portal namespace"
+          echo ""
+          echo "=== Workspaces Pods ==="
+          kubectl get pods -n workspaces -o wide || echo "No pods in workspaces namespace"
