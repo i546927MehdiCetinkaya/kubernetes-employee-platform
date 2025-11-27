@@ -28,6 +28,12 @@ variable "ssm_policy_arn" {
   type        = string
 }
 
+variable "directory_id" {
+  description = "ID of the AWS Directory Service (optional)"
+  type        = string
+  default     = ""
+}
+
 variable "environment" {
   description = "Environment name"
   type        = string

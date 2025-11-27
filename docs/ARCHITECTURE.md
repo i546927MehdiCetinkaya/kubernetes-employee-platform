@@ -27,6 +27,11 @@ flowchart TB
             end
         end
         
+        subgraph Identity["Identity & Access"]
+            DS[AWS Directory Service<br/>Managed Microsoft AD]
+            IAM[IAM Roles<br/>Per Department]
+        end
+        
         subgraph Services["AWS Services"]
             DB[(DynamoDB<br/>EmployeeLifecycle Table<br/>+ Workspaces Table)]
             ECR[ECR<br/>Container Images]
@@ -52,6 +57,8 @@ flowchart TB
     BE -->|Create Workspace Pod via K8s Job| WS_NS
     BE -->|Store Workspace Metadata| DB
     BE -->|Read Workspace Config| SSM
+    BE -->|Manage Directory Users| DS
+    DS -->|Role Assignment| IAM
     HR_NS -.->|Pull Images via VPC Endpoint| VPCe_ECR
     WS_NS -.->|Pull Images via VPC Endpoint| VPCe_ECR
     VPCe_ECR -.-> ECR
@@ -65,7 +72,36 @@ flowchart TB
     
     style VPCe fill:#e1f5ff
     style Services fill:#fff4e6
+    style Identity fill:#e8f5e9
 ```
+
+---
+
+## Identity & Access Management
+
+### IAM Roles Per Department (No IAM Users)
+
+| Role | Department | Key Permissions |
+|------|------------|-----------------|
+| `infra-role` | IT, DevOps, Infrastructure | EKS describe, EC2 read, CloudWatch, SSM read |
+| `developer-role` | Engineering, Development | ECR push/pull, CodeBuild, CloudWatch logs |
+| `hr-role` | HR, Human Resources | DynamoDB employee CRUD, workspaces read |
+| `manager-role` | Management, Executive | DynamoDB read-only, CloudWatch read |
+| `admin-role` | Administration | Full access to all project resources |
+
+### Service Roles (IRSA)
+
+| Role | Service | Purpose |
+|------|---------|---------|
+| `hr-portal-role` | Backend API | DynamoDB, SSM, Directory Service access |
+| `workspace-role` | Workspace Provisioner | CloudWatch logs, workspace management |
+
+**Key Design Decisions:**
+- **No IAM Users**: All human access via IAM Roles (school/enterprise requirement)
+- **Directory Service**: AWS Managed Microsoft AD for centralized identity
+- **Department-based Roles**: Each department has specific, scoped permissions
+- **SAML Federation**: Employees assume roles via Directory Service integration
+- **IRSA for Services**: Kubernetes pods use IAM Roles for Service Accounts
 
 ---
 

@@ -84,6 +84,20 @@ variable "log_retention_days" {
   default     = 30
 }
 
+# Directory Service Configuration
+variable "enable_directory_service" {
+  description = "Enable AWS Directory Service for identity management"
+  type        = bool
+  default     = true
+}
+
+variable "directory_admin_password" {
+  description = "Admin password for AWS Directory Service"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "tags" {
   description = "Additional tags for all resources"
   type        = map(string)

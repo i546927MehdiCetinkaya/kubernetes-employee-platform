@@ -212,6 +212,161 @@ async function getEmailConfig() {
   }
 }
 
+/**
+ * Get Directory Service configuration from SSM
+ */
+async function getDirectoryConfig() {
+  try {
+    const directoryIdParam = await ssmClient.send(new GetParameterCommand({
+      Name: `/${CLUSTER_NAME}/directory/id`
+    }));
+    
+    const directoryDomainParam = await ssmClient.send(new GetParameterCommand({
+      Name: `/${CLUSTER_NAME}/directory/domain`
+    }));
+    
+    let accessUrl = null;
+    try {
+      const accessUrlParam = await ssmClient.send(new GetParameterCommand({
+        Name: `/${CLUSTER_NAME}/directory/access-url`
+      }));
+      accessUrl = accessUrlParam.Parameter.Value;
+    } catch (e) {
+      // Access URL is optional
+    }
+    
+    return {
+      enabled: true,
+      directoryId: directoryIdParam.Parameter.Value,
+      domain: directoryDomainParam.Parameter.Value,
+      accessUrl
+    };
+  } catch (error) {
+    if (error.name === 'ParameterNotFound') {
+      return { enabled: false };
+    }
+    logger.error('Failed to retrieve directory configuration from SSM:', error);
+    return { enabled: false };
+  }
+}
+
+/**
+ * Store Directory user mapping in SSM
+ */
+async function storeDirectoryUserMapping(employeeId, userMapping) {
+  const parameterName = `/${CLUSTER_NAME}/directory/users/${employeeId}`;
+  
+  try {
+    try {
+      const createCommand = new PutParameterCommand({
+        Name: parameterName,
+        Value: JSON.stringify(userMapping),
+        Type: 'String',
+        Description: `Directory user mapping for employee ${employeeId}`,
+        Tags: [
+          { Key: 'EmployeeID', Value: employeeId },
+          { Key: 'Type', Value: 'DirectoryUserMapping' },
+          { Key: 'Username', Value: userMapping.username }
+        ]
+      });
+      await ssmClient.send(createCommand);
+    } catch (createError) {
+      if (createError.name === 'ParameterAlreadyExists') {
+        const updateCommand = new PutParameterCommand({
+          Name: parameterName,
+          Value: JSON.stringify(userMapping),
+          Type: 'String',
+          Description: `Directory user mapping for employee ${employeeId}`,
+          Overwrite: true
+        });
+        await ssmClient.send(updateCommand);
+      } else {
+        throw createError;
+      }
+    }
+    
+    logger.info(`Directory user mapping stored for employee ${employeeId}`);
+    return { success: true };
+  } catch (error) {
+    logger.error(`Failed to store directory user mapping for ${employeeId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Get Directory user mapping from SSM
+ */
+async function getDirectoryUserMapping(employeeId) {
+  const parameterName = `/${CLUSTER_NAME}/directory/users/${employeeId}`;
+  
+  try {
+    const command = new GetParameterCommand({
+      Name: parameterName
+    });
+    
+    const response = await ssmClient.send(command);
+    return JSON.parse(response.Parameter.Value);
+  } catch (error) {
+    if (error.name === 'ParameterNotFound') {
+      return null;
+    }
+    logger.error(`Failed to retrieve directory user mapping for ${employeeId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Delete Directory user mapping from SSM
+ */
+async function deleteDirectoryUserMapping(employeeId) {
+  const parameterName = `/${CLUSTER_NAME}/directory/users/${employeeId}`;
+  
+  try {
+    const command = new DeleteParameterCommand({
+      Name: parameterName
+    });
+    
+    await ssmClient.send(command);
+    logger.info(`Directory user mapping deleted for employee ${employeeId}`);
+    return { success: true };
+  } catch (error) {
+    if (error.name === 'ParameterNotFound') {
+      return { success: true };
+    }
+    logger.error(`Failed to delete directory user mapping for ${employeeId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Get IAM Role mappings from SSM
+ */
+async function getRoleMappings() {
+  const parameterName = `/${CLUSTER_NAME}/iam/role-mappings`;
+  
+  try {
+    const command = new GetParameterCommand({
+      Name: parameterName
+    });
+    
+    const response = await ssmClient.send(command);
+    return JSON.parse(response.Parameter.Value);
+  } catch (error) {
+    if (error.name === 'ParameterNotFound') {
+      // Return default mappings
+      return {
+        'Infra-Team': 'infra-role',
+        'Developers': 'developer-role',
+        'HR-Team': 'hr-role',
+        'Managers': 'manager-role',
+        'Admins': 'admin-role'
+      };
+    }
+    logger.error('Failed to retrieve role mappings from SSM:', error);
+    throw error;
+  }
+}
+
 // NOTE: Email templates are now stored in src/services/email.js
 // SSM Parameter Store doesn't support {{}} template variables
 
@@ -287,6 +442,11 @@ module.exports = {
   storeWorkspaceMetadata,
   getWorkspaceMetadata,
   getEmailConfig,
+  getDirectoryConfig,
+  storeDirectoryUserMapping,
+  getDirectoryUserMapping,
+  deleteDirectoryUserMapping,
+  getRoleMappings,
   storeAuditLog,
   getEmployeeWorkspaceParameters
 };

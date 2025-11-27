@@ -71,6 +71,53 @@ output "workspace_service_account_role_arn" {
   value       = module.iam.workspace_role_arn
 }
 
+# Department IAM Roles
+output "infra_role_arn" {
+  description = "ARN of Infrastructure Team IAM role"
+  value       = module.iam.infra_role_arn
+}
+
+output "developer_role_arn" {
+  description = "ARN of Developer IAM role"
+  value       = module.iam.developer_role_arn
+}
+
+output "hr_role_arn" {
+  description = "ARN of HR Team IAM role"
+  value       = module.iam.hr_role_arn
+}
+
+output "manager_role_arn" {
+  description = "ARN of Manager IAM role"
+  value       = module.iam.manager_role_arn
+}
+
+output "admin_role_arn" {
+  description = "ARN of Admin IAM role"
+  value       = module.iam.admin_role_arn
+}
+
+output "role_mappings" {
+  description = "Mapping of department groups to IAM Role ARNs"
+  value       = module.iam.role_mappings
+}
+
+# Directory Service Outputs
+output "directory_id" {
+  description = "ID of AWS Directory Service"
+  value       = var.enable_directory_service ? module.directory_service[0].directory_id : null
+}
+
+output "directory_name" {
+  description = "Domain name of AWS Directory Service"
+  value       = var.enable_directory_service ? module.directory_service[0].directory_name : null
+}
+
+output "directory_dns_ip_addresses" {
+  description = "DNS IP addresses of AWS Directory Service"
+  value       = var.enable_directory_service ? module.directory_service[0].directory_dns_ip_addresses : null
+}
+
 output "vpc_endpoint_dynamodb_id" {
   description = "ID of DynamoDB VPC endpoint"
   value       = module.vpc_endpoints.dynamodb_endpoint_id

@@ -128,9 +128,25 @@ module "iam" {
   dynamodb_table_arn            = module.dynamodb.table_arn
   dynamodb_workspaces_table_arn = module.dynamodb.workspaces_table_arn
   ssm_policy_arn                = module.systems_manager.hr_portal_ssm_policy_arn
+  directory_id                  = var.enable_directory_service ? module.directory_service[0].directory_id : ""
   environment                   = var.environment
 
   depends_on = [module.eks, module.dynamodb, module.systems_manager]
+}
+
+# Directory Service Module (AWS Managed Microsoft AD)
+module "directory_service" {
+  source = "./modules/directory-service"
+  count  = var.enable_directory_service ? 1 : 0
+
+  cluster_name       = var.cluster_name
+  vpc_id             = module.vpc.vpc_id
+  vpc_cidr           = var.vpc_cidr
+  private_subnet_ids = slice(module.vpc.private_subnet_ids, 0, 2) # AD requires exactly 2 subnets
+  admin_password     = var.directory_admin_password
+  environment        = var.environment
+
+  depends_on = [module.vpc]
 }
 
 # EBS CSI Driver Module
