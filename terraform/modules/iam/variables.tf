@@ -34,6 +34,12 @@ variable "directory_id" {
   default     = ""
 }
 
+variable "enable_directory_service" {
+  description = "Whether Directory Service is enabled"
+  type        = bool
+  default     = false
+}
+
 variable "environment" {
   description = "Environment name"
   type        = string

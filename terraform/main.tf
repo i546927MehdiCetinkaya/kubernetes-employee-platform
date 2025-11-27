@@ -128,6 +128,7 @@ module "iam" {
   dynamodb_table_arn            = module.dynamodb.table_arn
   dynamodb_workspaces_table_arn = module.dynamodb.workspaces_table_arn
   ssm_policy_arn                = module.systems_manager.hr_portal_ssm_policy_arn
+  enable_directory_service      = var.enable_directory_service
   directory_id                  = var.enable_directory_service ? module.directory_service[0].directory_id : ""
   environment                   = var.environment
 

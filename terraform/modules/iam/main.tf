@@ -70,7 +70,7 @@ resource "aws_iam_role_policy" "hr_portal_dynamodb" {
 
 # HR Portal can manage Directory Service users
 resource "aws_iam_role_policy" "hr_portal_directory" {
-  count = var.directory_id != "" ? 1 : 0
+  count = var.enable_directory_service ? 1 : 0
   name  = "directory-service-access"
   role  = aws_iam_role.hr_portal.id
 
@@ -91,7 +91,7 @@ resource "aws_iam_role_policy" "hr_portal_directory" {
           "ds:DescribeGroups",
           "ds:ListGroupsForUser"
         ]
-        Resource = "arn:aws:ds:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:directory/${var.directory_id}"
+        Resource = var.directory_id != "" ? "arn:aws:ds:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:directory/${var.directory_id}" : "*"
       }
     ]
   })
