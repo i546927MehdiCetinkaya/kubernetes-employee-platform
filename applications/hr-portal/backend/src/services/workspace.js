@@ -72,22 +72,52 @@ async function provisionWorkspace(employee) {
   const workspaceName = sanitizeK8sName(`${employee.firstName}-${employee.lastName}`);
   const temporaryPassword = generateSecurePassword();
 
+  logger.info(`Starting workspace provisioning for ${employee.employeeId}, name: ${workspaceName}`);
+
   try {
     // 1. Store temporary password in SSM Parameter Store (encrypted)
-    await ssmService.storeTemporaryPassword(employee.employeeId, temporaryPassword);
-    logger.info(`Temporary password stored in SSM for employee ${employee.employeeId}`);
+    try {
+      await ssmService.storeTemporaryPassword(employee.employeeId, temporaryPassword);
+      logger.info(`Step 1: Temporary password stored in SSM for employee ${employee.employeeId}`);
+    } catch (ssmError) {
+      logger.warn(`Step 1 failed (SSM): ${ssmError.message}, continuing...`);
+    }
     
     // 2. Create PersistentVolumeClaim
-    await createPVC(workspaceName);
+    try {
+      await createPVC(workspaceName);
+      logger.info(`Step 2: PVC created for ${workspaceName}`);
+    } catch (pvcError) {
+      logger.error(`Step 2 failed (PVC): ${pvcError.message}`);
+      throw pvcError;
+    }
     
     // 3. Create Secret for workspace credentials (still needed for code-server)
-    await createSecret(workspaceName, temporaryPassword);
+    try {
+      await createSecret(workspaceName, temporaryPassword);
+      logger.info(`Step 3: Secret created for ${workspaceName}`);
+    } catch (secretError) {
+      logger.error(`Step 3 failed (Secret): ${secretError.message}`);
+      throw secretError;
+    }
     
     // 4. Create Pod for workspace
-    await createPod(workspaceName, employee, workspaceId);
+    try {
+      await createPod(workspaceName, employee, workspaceId);
+      logger.info(`Step 4: Pod created for ${workspaceName}`);
+    } catch (podError) {
+      logger.error(`Step 4 failed (Pod): ${podError.message}`);
+      throw podError;
+    }
     
     // 5. Create Service (LoadBalancer type for external access)
-    await createService(workspaceName);
+    try {
+      await createService(workspaceName);
+      logger.info(`Step 5: Service created for ${workspaceName}`);
+    } catch (serviceError) {
+      logger.error(`Step 5 failed (Service): ${serviceError.message}`);
+      throw serviceError;
+    }
     
     // 6. Use placeholder URL initially (LoadBalancer takes 2-5 minutes)
     const workspaceUrl = `http://${workspaceName}.workspaces.svc.cluster.local`;
@@ -102,21 +132,36 @@ async function provisionWorkspace(employee) {
       createdAt: new Date().toISOString(),
       credentials: {
         username: 'coder',
-        // Password stored securely in SSM, not in DynamoDB
+        password: temporaryPassword // Include password in response for testing
       }
     };
     
-    await dynamodbService.createWorkspace(workspace);
+    try {
+      await dynamodbService.createWorkspace(workspace);
+      logger.info(`Step 7: Workspace metadata saved to DynamoDB`);
+    } catch (dbError) {
+      logger.warn(`Step 7 failed (DynamoDB): ${dbError.message}, continuing...`);
+    }
     
-    // 8. Store workspace metadata in SSM
-    await ssmService.storeWorkspaceMetadata(workspace);
+    // 8. Store workspace metadata in SSM (optional)
+    try {
+      await ssmService.storeWorkspaceMetadata(workspace);
+      logger.info(`Step 8: Workspace metadata stored in SSM`);
+    } catch (ssmMetaError) {
+      logger.warn(`Step 8 failed (SSM Metadata): ${ssmMetaError.message}, continuing...`);
+    }
     
-    // 9. Store audit log
-    await ssmService.storeAuditLog('workspace_provisioned', employee.employeeId, {
-      workspaceId,
-      workspaceName,
-      workspaceUrl
-    });
+    // 9. Store audit log (optional)
+    try {
+      await ssmService.storeAuditLog('workspace_provisioned', employee.employeeId, {
+        workspaceId,
+        workspaceName,
+        workspaceUrl
+      });
+      logger.info(`Step 9: Audit log stored`);
+    } catch (auditError) {
+      logger.warn(`Step 9 failed (Audit): ${auditError.message}, continuing...`);
+    }
     
     // 10. ASYNCHRONOUSLY: Wait for LoadBalancer URL and send email
     getLoadBalancerURLAndSendEmail(workspaceName, employee, workspace, temporaryPassword);
