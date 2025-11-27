@@ -121,10 +121,38 @@ resource "aws_cloudwatch_log_group" "directory" {
   }
 }
 
+# Resource Policy to allow Directory Service to write logs
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+
+resource "aws_cloudwatch_log_resource_policy" "directory" {
+  policy_name = "${var.cluster_name}-directory-logs-policy"
+
+  policy_document = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "DSLogSubscriptionWrite"
+        Effect = "Allow"
+        Principal = {
+          Service = "ds.amazonaws.com"
+        }
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "${aws_cloudwatch_log_group.directory.arn}:*"
+      }
+    ]
+  })
+}
+
 # Enable logging for Directory Service
 resource "aws_directory_service_log_subscription" "main" {
   directory_id   = aws_directory_service_directory.main.id
   log_group_name = aws_cloudwatch_log_group.directory.name
+
+  depends_on = [aws_cloudwatch_log_resource_policy.directory]
 }
 
 # SSM Parameters for Directory Configuration
