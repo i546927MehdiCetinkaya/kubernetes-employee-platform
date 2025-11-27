@@ -33,14 +33,30 @@ router.get('/debug/k8s', async (req, res) => {
     if (config !== 'none') {
       const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
       try {
-        // Try to list pods in workspaces namespace (our main target)
+        // Get pods with full status
         const pods = await k8sApi.listNamespacedPod('workspaces');
+        const podDetails = pods.body.items.map(p => ({
+          name: p.metadata.name,
+          phase: p.status.phase,
+          conditions: p.status.conditions,
+          containerStatuses: p.status.containerStatuses
+        }));
+        
+        // Get services with LoadBalancer info
+        const services = await k8sApi.listNamespacedService('workspaces');
+        const serviceDetails = services.body.items.map(s => ({
+          name: s.metadata.name,
+          type: s.spec.type,
+          loadBalancer: s.status.loadBalancer,
+          ports: s.spec.ports
+        }));
+        
         res.json({
           status: 'connected',
           config,
-          clusterInfo,
           podCount: pods.body.items.length,
-          pods: pods.body.items.map(p => p.metadata.name)
+          pods: podDetails,
+          services: serviceDetails
         });
       } catch (apiError) {
         res.json({
