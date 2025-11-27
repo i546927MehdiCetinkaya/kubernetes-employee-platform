@@ -273,4 +273,82 @@ router.delete('/debug/db/:workspaceId', async (req, res) => {
   }
 });
 
+// Rebuild workspace entries from K8s state
+router.post('/debug/rebuild', async (req, res) => {
+  try {
+    const k8s = require('@kubernetes/client-node');
+    const kc = new k8s.KubeConfig();
+    kc.loadFromCluster();
+    const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
+    
+    // Get running pods with their labels (to get employeeId)
+    const pods = await k8sApi.listNamespacedPod('workspaces');
+    
+    // Get services with LoadBalancer URLs
+    const services = await k8sApi.listNamespacedService('workspaces');
+    const serviceUrls = {};
+    for (const svc of services.body.items) {
+      if (svc.status.loadBalancer && svc.status.loadBalancer.ingress && svc.status.loadBalancer.ingress[0]) {
+        const hostname = svc.status.loadBalancer.ingress[0].hostname;
+        serviceUrls[svc.metadata.name] = `http://${hostname}`;
+      }
+    }
+    
+    // Clear all existing workspaces from DynamoDB
+    const existingWorkspaces = await dynamodbService.getAllWorkspaces();
+    for (const ws of existingWorkspaces) {
+      await dynamodbService.deleteWorkspace(ws.workspaceId);
+    }
+    
+    const results = { created: [], errors: [] };
+    
+    for (const pod of pods.body.items) {
+      const name = pod.metadata.name;
+      const employeeId = pod.metadata.labels?.employeeId;
+      
+      if (!employeeId) {
+        results.errors.push({ name, error: 'No employeeId label' });
+        continue;
+      }
+      
+      // Get the secret for this workspace
+      let password = 'unknown';
+      try {
+        const secret = await k8sApi.readNamespacedSecret(`${name}-secret`, 'workspaces');
+        // Try vnc-password first, then password
+        if (secret.body.data['vnc-password']) {
+          password = Buffer.from(secret.body.data['vnc-password'], 'base64').toString();
+        } else if (secret.body.data['password']) {
+          password = Buffer.from(secret.body.data['password'], 'base64').toString();
+        }
+      } catch (e) {
+        results.errors.push({ name, error: `Secret error: ${e.message}` });
+      }
+      
+      const url = serviceUrls[name] || 'unknown';
+      
+      // Create workspace entry
+      const workspace = {
+        workspaceId: require('uuid').v4(),
+        employeeId,
+        name,
+        url,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        credentials: {
+          username: 'coder',
+          password
+        }
+      };
+      
+      await dynamodbService.createWorkspace(workspace);
+      results.created.push({ name, employeeId, url });
+    }
+    
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: error.message, stack: error.stack });
+  }
+});
+
 module.exports = router;

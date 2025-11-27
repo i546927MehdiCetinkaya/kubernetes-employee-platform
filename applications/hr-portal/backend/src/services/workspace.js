@@ -299,7 +299,8 @@ async function createSecret(name, password) {
     },
     type: 'Opaque',
     stringData: {
-      password: password
+      password: password,
+      'vnc-password': password  // Also store as vnc-password for rebuild endpoint
     }
   };
 
@@ -334,6 +335,7 @@ async function createPod(name, employee, workspaceId) {
       labels: {
         app: 'workspace',
         employee: name,
+        employeeId: employee.employeeId,
         role: employee.role,
         workspaceId: workspaceId
       }
