@@ -197,6 +197,16 @@ router.post('/debug/sync', async (req, res) => {
     const pods = await k8sApi.listNamespacedPod('workspaces');
     const runningPodNames = new Set(pods.body.items.map(p => p.metadata.name));
     
+    // Get services with LoadBalancer URLs
+    const services = await k8sApi.listNamespacedService('workspaces');
+    const serviceUrls = {};
+    for (const svc of services.body.items) {
+      if (svc.status.loadBalancer && svc.status.loadBalancer.ingress && svc.status.loadBalancer.ingress[0]) {
+        const hostname = svc.status.loadBalancer.ingress[0].hostname;
+        serviceUrls[svc.metadata.name] = `http://${hostname}`;
+      }
+    }
+    
     // Get all workspaces from DynamoDB
     const workspaces = await dynamodbService.getAllWorkspaces();
     
@@ -207,18 +217,43 @@ router.post('/debug/sync', async (req, res) => {
       updated: []
     };
     
+    // Group workspaces by employeeId
+    const byEmployee = {};
     for (const ws of workspaces) {
-      if (runningPodNames.has(ws.name)) {
-        // Pod exists - update status to active if not already
-        if (ws.status !== 'active') {
-          await dynamodbService.updateWorkspaceStatus(ws.workspaceId, 'active');
-          results.updated.push(ws.name);
+      if (!byEmployee[ws.employeeId]) {
+        byEmployee[ws.employeeId] = [];
+      }
+      byEmployee[ws.employeeId].push(ws);
+    }
+    
+    // For each employee, keep only the workspace that matches a running service
+    for (const employeeId of Object.keys(byEmployee)) {
+      const employeeWorkspaces = byEmployee[employeeId];
+      let foundMatch = false;
+      
+      for (const ws of employeeWorkspaces) {
+        // Check if this workspace URL matches a running service
+        const serviceUrl = serviceUrls[ws.name];
+        const urlMatches = serviceUrl && ws.url && ws.url.includes(serviceUrl.split('://')[1].split('.')[0]);
+        
+        if (runningPodNames.has(ws.name) && !foundMatch) {
+          // First matching workspace for this employee - keep it
+          foundMatch = true;
+          if (ws.status !== 'active') {
+            // Also update the URL to the current service URL if available
+            const updates = { status: 'active' };
+            if (serviceUrl) {
+              updates.url = serviceUrl;
+            }
+            await dynamodbService.updateWorkspace(ws.workspaceId, updates);
+            results.updated.push({ name: ws.name, workspaceId: ws.workspaceId });
+          }
+          results.kept.push({ name: ws.name, workspaceId: ws.workspaceId });
+        } else {
+          // Either pod doesn't exist, or we already kept one for this employee
+          await dynamodbService.deleteWorkspace(ws.workspaceId);
+          results.deleted.push({ name: ws.name, workspaceId: ws.workspaceId, reason: foundMatch ? 'duplicate' : 'no-pod' });
         }
-        results.kept.push(ws.name);
-      } else {
-        // Pod doesn't exist - delete from DynamoDB
-        await dynamodbService.deleteWorkspace(ws.workspaceId);
-        results.deleted.push(ws.name);
       }
     }
     
