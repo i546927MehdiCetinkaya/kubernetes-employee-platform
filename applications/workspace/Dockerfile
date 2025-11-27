@@ -54,5 +54,9 @@ WORKDIR /home/coder/workspace
 # Expose port
 EXPOSE 8080
 
-# Start code-server
-CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "/home/coder/workspace"]
+# Create entrypoint script that sets password and starts code-server
+# code-server reads PASSWORD from environment variable automatically
+ENV PASSWORD=""
+
+# Start code-server - it will use $PASSWORD env var for authentication
+CMD ["code-server", "--bind-addr", "0.0.0.0:8080", "--auth", "password", "/home/coder/workspace"]

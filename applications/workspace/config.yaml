@@ -3,3 +3,4 @@ auth: password
 cert: false
 disable-telemetry: true
 disable-update-check: true
+# Password is set via $PASSWORD environment variable
