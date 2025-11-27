@@ -626,14 +626,14 @@ resource "aws_ssm_parameter" "role_mappings" {
   description = "Mapping of department groups to IAM Role ARNs"
   type        = "String"
   value = jsonencode({
-    "Infra-Team"   = aws_iam_role.infra_role.arn
-    "Developers"   = aws_iam_role.developer_role.arn
-    "HR-Team"      = aws_iam_role.hr_role.arn
-    "Managers"     = aws_iam_role.manager_role.arn
-    "Admins"       = aws_iam_role.admin_role.arn
+    "Infra-Team" = aws_iam_role.infra_role.arn
+    "Developers" = aws_iam_role.developer_role.arn
+    "HR-Team"    = aws_iam_role.hr_role.arn
+    "Managers"   = aws_iam_role.manager_role.arn
+    "Admins"     = aws_iam_role.admin_role.arn
     # Service roles (not for direct user assumption)
-    "hr-portal"    = aws_iam_role.hr_portal.arn
-    "workspace"    = aws_iam_role.workspace.arn
+    "hr-portal" = aws_iam_role.hr_portal.arn
+    "workspace" = aws_iam_role.workspace.arn
   })
 
   tags = {

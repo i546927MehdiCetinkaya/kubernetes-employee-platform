@@ -3,11 +3,11 @@
 
 # AWS Managed Microsoft AD
 resource "aws_directory_service_directory" "main" {
-  name        = "innovatech.local"
-  short_name  = "INNOVATECH"
-  password    = var.admin_password
-  edition     = "Standard"
-  type        = "MicrosoftAD"
+  name       = "innovatech.local"
+  short_name = "INNOVATECH"
+  password   = var.admin_password
+  edition    = "Standard"
+  type       = "MicrosoftAD"
 
   vpc_settings {
     vpc_id     = var.vpc_id
