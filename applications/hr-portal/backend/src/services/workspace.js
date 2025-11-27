@@ -88,7 +88,7 @@ async function provisionWorkspace(employee) {
       await createPVC(workspaceName);
       logger.info(`Step 2: PVC created for ${workspaceName}`);
     } catch (pvcError) {
-      logger.error(`Step 2 failed (PVC): ${pvcError.message}`);
+      logger.error(`Step 2 failed (PVC): ${pvcError.message}, statusCode: ${pvcError.statusCode}, body: ${JSON.stringify(pvcError.body)}`);
       throw pvcError;
     }
     

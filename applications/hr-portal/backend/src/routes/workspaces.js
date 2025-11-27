@@ -111,7 +111,9 @@ router.post('/provision/:employeeId', async (req, res, next) => {
     res.status(500).json({ 
       error: error.message, 
       stack: error.stack,
-      name: error.name 
+      name: error.name,
+      statusCode: error.statusCode,
+      body: error.body
     });
   }
 });
