@@ -521,7 +521,6 @@ async function getLoadBalancerURLFast(name) {
   // If still not ready, throw error instead of using local URL
   throw new Error(`LoadBalancer not ready after 2 minutes for ${name}. Please try again later.`);
 }
-}
 
 /**
  * Asynchronously wait for LoadBalancer URL and send welcome email
