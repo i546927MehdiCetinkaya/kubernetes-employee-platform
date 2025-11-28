@@ -1,373 +1,428 @@
 ﻿# Architecture
 
-## System Architecture
+## Current System State
 
-```mermaid
-flowchart TB
-    subgraph Users
-        HR[HR Staff]
-        EMP[Employee]
-    end
-    
-    subgraph AWS["AWS Cloud"]
-        subgraph Public["Public Subnet"]
-            LB[Application Load Balancer<br/>AWS Load Balancer Controller]
-        end
-        
-        subgraph Private["Private Subnet - EKS Cluster"]
-            subgraph HR_NS["Namespace: hr-portal"]
-                FE[Frontend<br/>React + Nginx]
-                BE[Backend API<br/>Node.js + Express]
-            end
-            
-            subgraph WS_NS["Namespace: workspaces"]
-                WS1[Workspace Pod 1<br/>VSCode Server + Tools]
-                WS2[Workspace Pod 2<br/>VSCode Server + Tools]
-                WS3[Workspace Pod N<br/>VSCode Server + Tools]
-            end
-        end
-        
-        subgraph Identity["Identity & Access"]
-            DS[AWS Directory Service<br/>Managed Microsoft AD]
-            IAM[IAM Roles<br/>Per Department]
-        end
-        
-        subgraph Services["AWS Services"]
-            DB[(DynamoDB<br/>EmployeeLifecycle Table<br/>+ Workspaces Table)]
-            ECR[ECR<br/>Container Images]
-            SSM[Systems Manager<br/>SSM Parameter Store]
-            CW[CloudWatch<br/>Logs + Metrics]
-        end
-        
-        subgraph VPCe["VPC Endpoints"]
-            VPCe_ECR[ECR API + DKR]
-            VPCe_DDB[DynamoDB]
-            VPCe_S3[S3]
-            VPCe_SSM[SSM]
-            VPCe_CW[CloudWatch Logs]
-        end
-    end
-    
-    HR -->|HTTPS| LB
-    EMP -->|HTTPS| LB
-    LB -->|Route /| FE
-    LB -->|Route /api| BE
-    FE -->|API Calls| BE
-    BE -->|Store/Retrieve Employee Data| DB
-    BE -->|Create Workspace Pod via K8s Job| WS_NS
-    BE -->|Store Workspace Metadata| DB
-    BE -->|Read Workspace Config| SSM
-    BE -->|Manage Directory Users| DS
-    DS -->|Role Assignment| IAM
-    HR_NS -.->|Pull Images via VPC Endpoint| VPCe_ECR
-    WS_NS -.->|Pull Images via VPC Endpoint| VPCe_ECR
-    VPCe_ECR -.-> ECR
-    BE -.->|Write/Read Data via VPC Endpoint| VPCe_DDB
-    VPCe_DDB -.-> DB
-    HR_NS -.->|Send Logs via VPC Endpoint| VPCe_CW
-    WS_NS -.->|Send Logs via VPC Endpoint| VPCe_CW
-    VPCe_CW -.-> CW
-    BE -.->|Read Parameters via VPC Endpoint| VPCe_SSM
-    VPCe_SSM -.-> SSM
-    
-    style VPCe fill:#e1f5ff
-    style Services fill:#fff4e6
-    style Identity fill:#e8f5e9
+This document describes the **actual implemented state** of the InnovaTech Employee Lifecycle Platform as of November 2025.
+
+---
+
+## High-Level Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                              INTERNET                                       │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    ▼                               ▼
+        ┌───────────────────┐           ┌───────────────────┐
+        │  HR Portal NLB    │           │ Workspace NLBs    │
+        │  (Network LB)     │           │ (per employee)    │
+        │  Port 80          │           │ Port 80 → 6080    │
+        └─────────┬─────────┘           └─────────┬─────────┘
+                  │                               │
+                  ▼                               ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│                        AWS EKS CLUSTER                                      │
+│                    (innovatech-employee-lifecycle)                          │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │                     Private Subnets (10.0.101.0/24, 10.0.102.0/24)   │  │
+│  │                                                                       │  │
+│  │  ┌─────────────────────────┐      ┌─────────────────────────────┐    │  │
+│  │  │  Namespace: hr-portal   │      │  Namespace: workspaces      │    │  │
+│  │  │  ┌───────────────────┐  │      │                             │    │  │
+│  │  │  │ hr-portal-frontend│  │      │  ┌───────────────────────┐  │    │  │
+│  │  │  │ (React + nginx)   │  │      │  │ Pod: jan-jansen       │  │    │  │
+│  │  │  │ Replicas: 2       │  │      │  │ ┌─────────────────┐   │  │    │  │
+│  │  │  └───────────────────┘  │      │  │ │ Ubuntu 22.04    │   │  │    │  │
+│  │  │                         │      │  │ │ XFCE Desktop    │   │  │    │  │
+│  │  │  ┌───────────────────┐  │      │  │ │ TigerVNC        │   │  │    │  │
+│  │  │  │ hr-portal-backend │  │      │  │ │ noVNC (:6080)   │   │  │    │  │
+│  │  │  │ (Node.js/Express) │  │      │  │ └─────────────────┘   │  │    │  │
+│  │  │  │ Replicas: 2       │  │      │  └───────────────────────┘  │    │  │
+│  │  │  │                   │  │      │                             │    │  │
+│  │  │  │ IRSA: hr-portal-  │  │      │  ┌───────────────────────┐  │    │  │
+│  │  │  │       sa-role     │  │      │  │ Pod: kees-van-der-spek│  │    │  │
+│  │  │  └───────────────────┘  │      │  │ (same as above)       │  │    │  │
+│  │  └─────────────────────────┘      │  └───────────────────────┘  │    │  │
+│  │                                    │                             │    │  │
+│  │                                    │  ┌───────────────────────┐  │    │  │
+│  │                                    │  │ Pod: pieter-de-vries  │  │    │  │
+│  │                                    │  │ (same as above)       │  │    │  │
+│  │                                    │  └───────────────────────┘  │    │  │
+│  │                                    └─────────────────────────────┘    │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┼───────────────┐
+                    ▼               ▼               ▼
+        ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
+        │   DynamoDB    │  │     ECR       │  │  Directory    │
+        │   ┌─────────┐ │  │  ┌─────────┐  │  │   Service     │
+        │   │employees│ │  │  │backend  │  │  │ ┌───────────┐ │
+        │   │table    │ │  │  │image    │  │  │ │innovatech │ │
+        │   └─────────┘ │  │  └─────────┘  │  │ │.local     │ │
+        │   ┌─────────┐ │  │  ┌─────────┐  │  │ │(UNUSED)   │ │
+        │   │workspace│ │  │  │frontend │  │  │ └───────────┘ │
+        │   │table    │ │  │  │image    │  │  └───────────────┘
+        │   └─────────┘ │  │  └─────────┘  │
+        └───────────────┘  │  ┌─────────┐  │
+                           │  │workspace│  │
+                           │  │image    │  │
+                           │  └─────────┘  │
+                           └───────────────┘
+```
+
+---
+
+## Workspace Pod Architecture
+
+Each employee workspace is a Kubernetes pod running:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Workspace Pod                             │
+│  Name: {firstname}-{lastname} (e.g., jan-jansen)            │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │                Container: linux-desktop                 │ │
+│  │                                                         │ │
+│  │  ┌─────────────────────────────────────────────────┐   │ │
+│  │  │              Ubuntu 22.04 Base                   │   │ │
+│  │  │  ┌─────────────────────────────────────────┐    │   │ │
+│  │  │  │         XFCE4 Desktop Environment       │    │   │ │
+│  │  │  │  ┌─────────────────────────────────┐    │    │   │ │
+│  │  │  │  │         TigerVNC Server         │    │    │   │ │
+│  │  │  │  │         (Display :1)            │    │    │   │ │
+│  │  │  │  └───────────────┬─────────────────┘    │    │   │ │
+│  │  │  │                  │                       │    │   │ │
+│  │  │  │  ┌───────────────▼─────────────────┐    │    │   │ │
+│  │  │  │  │       noVNC Web Server          │    │    │   │ │
+│  │  │  │  │       Port 6080 (HTTP)          │    │    │   │ │
+│  │  │  │  └─────────────────────────────────┘    │    │   │ │
+│  │  │  └─────────────────────────────────────────┘    │   │ │
+│  │  │                                                  │   │ │
+│  │  │  Pre-installed: Firefox, Python3, Node.js,      │   │ │
+│  │  │                 Git, build-essential, VS Code    │   │ │
+│  │  └─────────────────────────────────────────────────┘   │ │
+│  │                                                         │ │
+│  │  Resources: 500m-1000m CPU, 1Gi-2Gi Memory             │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  Volumes:                                                    │
+│  - /home/employee/workspace (emptyDir - NOT persistent)     │
+│  - /tmp (emptyDir)                                          │
+│                                                              │
+│  Environment Variables:                                      │
+│  - EMPLOYEE_ID: {uuid}                                      │
+│  - EMPLOYEE_EMAIL: {email}                                  │
+│  - EMPLOYEE_ROLE: {role}                                    │
+│  - PASSWORD: (from Secret)                                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Data Flow
+
+### Employee Creation Flow
+```
+┌─────────┐     ┌─────────┐     ┌──────────┐
+│ Browser │────▶│ Frontend│────▶│ Backend  │
+│         │     │ (React) │     │ (Node.js)│
+└─────────┘     └─────────┘     └────┬─────┘
+                                     │
+                    ┌────────────────┴────────────────┐
+                    ▼                                 ▼
+            ┌───────────────┐                ┌───────────────┐
+            │   DynamoDB    │                │  Return JSON  │
+            │ PutItem       │                │  {employeeId} │
+            │ employees     │                └───────────────┘
+            └───────────────┘
+```
+
+### Workspace Provisioning Flow
+```
+┌─────────┐     ┌─────────┐     ┌──────────┐     ┌─────────────┐
+│ Browser │────▶│ Frontend│────▶│ Backend  │────▶│ Kubernetes  │
+│ Click   │     │         │     │          │     │ API Server  │
+│Provision│     └─────────┘     └────┬─────┘     └──────┬──────┘
+└─────────┘                          │                  │
+                                     │                  ▼
+                                     │         ┌───────────────┐
+                                     │         │ Create:       │
+                                     │         │ - Secret      │
+                                     │         │ - Pod         │
+                                     │         │ - Service(NLB)│
+                                     │         └───────┬───────┘
+                                     │                 │
+                                     │                 ▼
+                                     │         ┌───────────────┐
+                                     │         │ Wait for      │
+                                     │         │ LoadBalancer  │
+                                     │         │ (~2 minutes)  │
+                                     │         └───────┬───────┘
+                                     │                 │
+                                     ▼                 ▼
+                            ┌───────────────┐  ┌───────────────┐
+                            │ DynamoDB      │  │ Return URL +  │
+                            │ workspaces    │  │ Password      │
+                            │ table         │  └───────────────┘
+                            └───────────────┘
 ```
 
 ---
 
 ## Identity & Access Management
 
-### IAM Roles Per Department (No IAM Users)
+### What's Deployed (Infrastructure)
 
-| Role | Department | Key Permissions |
-|------|------------|-----------------|
-| `infra-role` | IT, DevOps, Infrastructure | EKS describe, EC2 read, CloudWatch, SSM read |
-| `developer-role` | Engineering, Development | ECR push/pull, CodeBuild, CloudWatch logs |
-| `hr-role` | HR, Human Resources | DynamoDB employee CRUD, workspaces read |
-| `manager-role` | Management, Executive | DynamoDB read-only, CloudWatch read |
-| `admin-role` | Administration | Full access to all project resources |
+| Component | Status | Details |
+|-----------|--------|---------|
+| **AWS Directory Service** | ✅ Deployed | Managed AD: `innovatech.local` (d-936793cdc1) |
+| **IAM Roles (Department)** | ✅ Deployed | 5 roles with department-specific permissions |
+| **IRSA (HR Portal)** | ✅ Working | `hr-portal-sa-role` for backend pod |
+| **Kubernetes RBAC** | ✅ Deployed | ClusterRoles and RoleBindings |
 
-### Service Roles (IRSA)
+### IAM Roles Per Department
 
-| Role | Service | Purpose |
-|------|---------|---------|
-| `hr-portal-role` | Backend API | DynamoDB, SSM, Directory Service access |
-| `workspace-role` | Workspace Provisioner | CloudWatch logs, workspace management |
-
-**Key Design Decisions:**
-- **No IAM Users**: All human access via IAM Roles (school/enterprise requirement)
-- **Directory Service**: AWS Managed Microsoft AD for centralized identity
-- **Department-based Roles**: Each department has specific, scoped permissions
-- **SAML Federation**: Employees assume roles via Directory Service integration
-- **IRSA for Services**: Kubernetes pods use IAM Roles for Service Accounts
-
----
-
-## AWS Network Architecture
-
-```mermaid
-flowchart TB
-    Internet((Internet))
-    
-    subgraph VPC["VPC: 10.0.0.0/16"]
-        subgraph AZ1["Availability Zone 1"]
-            subgraph PubSub1["Public Subnet 10.0.1.0/24"]
-                IGW[Internet Gateway]
-                ALB1[Application Load Balancer<br/>Target: Frontend + Backend]
-            end
-            
-            subgraph PrivSub1["Private Subnet 10.0.101.0/24"]
-                EKS1[EKS Node Group<br/>Managed Nodes]
-                POD1[Pods:<br/>hr-portal-frontend<br/>hr-portal-backend<br/>workspace-*]
-            end
-        end
-        
-        subgraph AZ2["Availability Zone 2"]
-            subgraph PubSub2["Public Subnet 10.0.2.0/24"]
-                ALB2[ALB<br/>Multi-AZ]
-            end
-            
-            subgraph PrivSub2["Private Subnet 10.0.102.0/24"]
-                EKS2[EKS Node Group<br/>Managed Nodes]
-                POD2[Pods:<br/>hr-portal-frontend<br/>hr-portal-backend<br/>workspace-*]
-            end
-        end
-        
-        subgraph Endpoints["VPC Endpoints - AWS PrivateLink"]
-            VPCe_DDB[DynamoDB<br/>Gateway Endpoint]
-            VPCe_ECR[ECR API<br/>Interface Endpoint]
-            VPCe_ECR_DKR[ECR Docker<br/>Interface Endpoint]
-            VPCe_S3[S3<br/>Gateway Endpoint]
-            VPCe_SSM[Systems Manager<br/>Interface Endpoint]
-            VPCe_CW[CloudWatch Logs<br/>Interface Endpoint]
-        end
-    end
-    
-    subgraph AWS_Services["AWS Managed Services"]
-        DDB[(DynamoDB<br/>EmployeeLifecycle<br/>Workspaces)]
-        ECR[ECR Repositories<br/>hr-portal-backend<br/>hr-portal-frontend<br/>employee-workspace]
-        S3[S3 Buckets<br/>Terraform State]
-        SSM_SVC[Systems Manager<br/>Parameter Store]
-        CW_SVC[CloudWatch<br/>Monitoring]
-    end
-    
-    Internet -->|HTTPS Only| IGW
-    IGW --> ALB1
-    IGW --> ALB2
-    ALB1 --> POD1
-    ALB2 --> POD2
-    
-    POD1 -.->|Private Access| VPCe_DDB
-    POD2 -.->|Private Access| VPCe_DDB
-    VPCe_DDB -.-> DDB
-    
-    POD1 -.->|Private Access| VPCe_ECR
-    POD2 -.->|Private Access| VPCe_ECR_DKR
-    VPCe_ECR -.-> ECR
-    VPCe_ECR_DKR -.-> ECR
-    
-    EKS1 -.->|Private Access| VPCe_S3
-    EKS2 -.->|Private Access| VPCe_S3
-    VPCe_S3 -.-> S3
-    
-    POD1 -.->|Private Access| VPCe_SSM
-    POD2 -.->|Private Access| VPCe_SSM
-    VPCe_SSM -.-> SSM_SVC
-    
-    POD1 -.->|Private Access| VPCe_CW
-    POD2 -.->|Private Access| VPCe_CW
-    VPCe_CW -.-> CW_SVC
-    
-    style Endpoints fill:#e1f5ff
-    style AWS_Services fill:#fff4e6
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    IAM ROLES (Deployed but NOT used by workspaces)  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
+│  │ infra-role   │  │developer-role│  │ hr-role      │               │
+│  │              │  │              │  │              │               │
+│  │ - EKS:Desc   │  │ - ECR:*      │  │ - DynamoDB:  │               │
+│  │ - EC2:Read   │  │ - CodeBuild  │  │   CRUD       │               │
+│  │ - CloudWatch │  │ - CloudWatch │  │ - Workspaces │               │
+│  │ - SSM:Read   │  │ - S3:Read    │  │   :Read      │               │
+│  └──────────────┘  └──────────────┘  └──────────────┘               │
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐                                 │
+│  │ manager-role │  │ admin-role   │                                 │
+│  │              │  │              │                                 │
+│  │ - DynamoDB:  │  │ - Full       │                                 │
+│  │   ReadOnly   │  │   Access     │                                 │
+│  │ - CloudWatch │  │              │                                 │
+│  │   :Read      │  │              │                                 │
+│  └──────────────┘  └──────────────┘                                 │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Key Architecture Decisions:**
-- **No NAT Gateway**: All AWS service communication via VPC endpoints (cost optimization: ~$32/month savings)
-- **No Direct Workspace Access**: Workspaces are backend-managed pods, credentials displayed in HR portal UI
-- **Private-Only Pods**: EKS nodes in private subnets, no direct internet access
-- **ALB Ingress**: AWS Load Balancer Controller provisions ALB automatically via Kubernetes Ingress
+### What's NOT Working
 
----
-
-## Data Flow
-
-```mermaid
-sequenceDiagram
-    participant HR as HR Portal<br/>(Frontend)
-    participant API as Backend API<br/>(Node.js)
-    participant DB as DynamoDB<br/>(EmployeeLifecycle)
-    participant K8S as Kubernetes API<br/>(EKS Control Plane)
-    participant WS_DB as DynamoDB<br/>(Workspaces Table)
-    participant SSM as Systems Manager<br/>(Parameter Store)
-    participant WS as Workspace Pod<br/>(VSCode Server)
-    
-    HR->>API: POST /employees<br/>{name, email, role}
-    API->>DB: PutItem<br/>Store employee data
-    DB-->>API: Success
-    
-    API->>SSM: GetParameter<br/>Fetch workspace config
-    SSM-->>API: {cpu, memory, storage}
-    
-    API->>K8S: Create Job<br/>provision-workspace-{employeeId}
-    K8S->>WS: Launch Pod<br/>employee-workspace-{id}
-    WS-->>K8S: Pod Running
-    K8S-->>API: Job Complete
-    
-    API->>WS_DB: PutItem<br/>Store workspace metadata<br/>{employeeId, podName, status}
-    WS_DB-->>API: Success
-    
-    API-->>HR: 201 Created<br/>{employeeId, workspaceUrl, credentials}
-    
-    Note over HR,WS: Credentials displayed in UI<br/>(no email sent - deviation from req)
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    MISSING INTEGRATIONS                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ❌ AD Authentication in Workspaces                                  │
+│     - Users login with generated passwords, NOT AD credentials      │
+│     - No PAM/SSSD/Winbind configuration in workspace image          │
+│                                                                      │
+│  ❌ IAM Role Assumption in Workspaces                                │
+│     - Pods don't have ServiceAccount with IRSA                      │
+│     - AWS CLI in workspace can't use department roles               │
+│                                                                      │
+│  ❌ SAML Federation                                                  │
+│     - No Identity Provider configured                                │
+│     - No SSO for AWS Console access                                 │
+│                                                                      │
+│  ❌ Kubernetes RBAC → AD Group Mapping                               │
+│     - RBAC exists but not linked to AD groups                       │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Infrastructure Components
+## Network Architecture
 
-### Terraform Modules
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        VPC: 10.0.0.0/16                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌───────────────────────┐    ┌───────────────────────┐             │
+│  │  Public Subnet 1      │    │  Public Subnet 2      │             │
+│  │  10.0.1.0/24          │    │  10.0.2.0/24          │             │
+│  │  AZ: eu-west-1a       │    │  AZ: eu-west-1b       │             │
+│  │                       │    │                       │             │
+│  │  ┌─────────────────┐  │    │  ┌─────────────────┐  │             │
+│  │  │ Internet GW     │  │    │  │ (Multi-AZ)      │  │             │
+│  │  └─────────────────┘  │    │  └─────────────────┘  │             │
+│  └───────────────────────┘    └───────────────────────┘             │
+│                                                                      │
+│  ┌───────────────────────┐    ┌───────────────────────┐             │
+│  │  Private Subnet 1     │    │  Private Subnet 2     │             │
+│  │  10.0.101.0/24        │    │  10.0.102.0/24        │             │
+│  │  AZ: eu-west-1a       │    │  AZ: eu-west-1b       │             │
+│  │                       │    │                       │             │
+│  │  ┌─────────────────┐  │    │  ┌─────────────────┐  │             │
+│  │  │ EKS Nodes       │  │    │  │ EKS Nodes       │  │             │
+│  │  │ (t3.medium)     │  │    │  │ (t3.medium)     │  │             │
+│  │  └─────────────────┘  │    │  └─────────────────┘  │             │
+│  └───────────────────────┘    └───────────────────────┘             │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐   │
+│  │                    VPC Endpoints (PrivateLink)                │   │
+│  │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐      │   │
+│  │  │ECR API │ │ECR DKR │ │   S3   │ │  SSM   │ │  CW    │      │   │
+│  │  │        │ │        │ │Gateway │ │        │ │ Logs   │      │   │
+│  │  └────────┘ └────────┘ └────────┘ └────────┘ └────────┘      │   │
+│  └──────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  ⚠️ NO NAT GATEWAY - All AWS access via VPC Endpoints              │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Terraform Modules
 
 | Module | Purpose | Key Resources |
 |--------|---------|---------------|
-| **vpc** | Network foundation | VPC, subnets (public/private), IGW, route tables |
-| **eks** | Kubernetes cluster | EKS cluster, managed node groups, OIDC provider |
-| **dynamodb** | Data storage | EmployeeLifecycle table, Workspaces table |
-| **iam** | Access control | Service account roles, IRSA for hr-portal & workspaces |
-| **vpc-endpoints** | Private AWS access | ECR, DynamoDB, S3, SSM, CloudWatch endpoints |
-| **systems-manager** | Configuration management | SSM parameters for workspace settings |
-| **ebs-csi** | Persistent storage | EBS CSI driver for workspace volumes |
-| **security-groups** | Network security | EKS cluster, node, pod security groups |
-| **ecr** | Container registry | Repositories for frontend, backend, workspace images |
-| **monitoring** | Observability | CloudWatch log groups, metric filters, dashboards |
+| `vpc` | Network foundation | VPC, subnets, IGW, route tables |
+| `eks` | Kubernetes cluster | EKS cluster, node groups, OIDC |
+| `dynamodb` | Data storage | employees table, workspaces table |
+| `iam` | Access control | Department roles, IRSA roles |
+| `vpc-endpoints` | Private AWS access | ECR, S3, SSM, CloudWatch endpoints |
+| `systems-manager` | Configuration | SSM parameters |
+| `ebs-csi` | Storage driver | EBS CSI driver (NOT working) |
+| `security-groups` | Network security | EKS, node, pod security groups |
+| `ecr` | Container registry | 3 repositories |
+| `monitoring` | Observability | CloudWatch log groups |
 
 ---
 
-## Applications
-
-### HR Portal
-- **Frontend**: React SPA served by nginx, containerized
-- **Backend**: Node.js Express API with AWS SDK integration
-- **Namespace**: `hr-portal`
-- **IAM Role**: `hr-portal-sa-role` (IRSA) with DynamoDB, SSM, EKS permissions
-
-### Employee Workspaces
-- **Image**: VSCode server + development tools (Git, Docker, Node.js)
-- **Provisioning**: Kubernetes Jobs created by backend API
-- **Namespace**: `workspaces` (isolated from hr-portal)
-- **Storage**: 20GB EBS volumes per workspace via EBS CSI driver
-- **Resources**: 2 vCPU, 4GB RAM per pod
-
----
-
-## Security
-
-### Zero Trust Principles
-- **Private Subnets Only**: All pods run without direct internet access
-- **VPC Endpoints**: Secure, private communication to AWS services
-- **IRSA (IAM Roles for Service Accounts)**: Pod-level AWS permissions via OIDC
-- **Network Policies**: Kubernetes namespace isolation
-- **RBAC**: Kubernetes role-based access control for service accounts
-
-### Security Groups
-| Group | Purpose | Rules |
-|-------|---------|-------|
-| EKS Cluster SG | Control plane | Ingress from nodes on 443 |
-| Node SG | Worker nodes | Ingress from ALB, cluster; egress to VPC endpoints |
-| Pod SG | Application pods | Restricted ingress based on namespace |
-
----
-
-## Scalability
-
-- **EKS Cluster Autoscaler**: Automatically scales node groups based on pod resource requests
-- **Horizontal Pod Autoscaler (HPA)**: Scales backend API pods based on CPU/memory
-- **DynamoDB On-Demand**: Automatically scales read/write capacity
-- **Multi-AZ**: EKS nodes and ALB span 2 availability zones
-
----
-
-## Monitoring
-
-### CloudWatch Integration
-- **Log Groups**: Separate groups for frontend, backend, workspace pods
-- **Metrics**: CPU, memory, network for EKS nodes and pods
-- **Alarms**: Triggers for pod failures, high error rates, resource exhaustion
-- **Dashboards**: Custom dashboard showing:
-  - Active employee count
-  - Workspace provisioning success rate
-  - API response times
-  - DynamoDB throttling events
-
----
-
-## Deployment
-
-### Infrastructure Provisioning
-1. **Terraform**: Provisions VPC, EKS, DynamoDB, IAM, VPC endpoints
-2. **State Management**: Remote state in S3 with DynamoDB locking
-3. **Terraform Modules**: Modular design for reusability
-
-### Application Deployment
-1. **Docker**: Build images for frontend, backend, workspace
-2. **ECR**: Push images to AWS ECR repositories
-3. **Kubernetes Manifests**: Deploy via kubectl:
-   - Namespaces
-   - Deployments (frontend, backend)
-   - Services (ClusterIP for backend, LoadBalancer for frontend)
-   - Ingress (ALB via AWS Load Balancer Controller)
-   - ServiceAccounts with IRSA annotations
-
-### CI/CD Pipeline
-- **GitHub Actions**: Automated on push to `main`
-- **Workflow**: Terraform plan → apply → Docker build → ECR push → kubectl apply
-- **OIDC Authentication**: GitHub Actions authenticate to AWS without static credentials
-
----
-
-## Design Deviations from Requirements
-
-### Email Notifications (REQ-NCA-P3-01)
-**Requirement**: Automated provisioning with email credentials via AWS SES  
-**Implementation**: Credentials displayed in HR Portal UI instead of email  
-**Justification**:
-- **Simplicity**: No SES configuration, DNS verification, or email templates needed
-- **Cost**: Saves SES costs (~$0.10 per 1,000 emails)
-- **Security**: Credentials not transmitted via email (reduces interception risk)
-- **User Experience**: Immediate access in portal vs. waiting for email delivery
-- **Core Requirement Met**: Automated provisioning still occurs, only delivery method differs
-
-### Internet Access Architecture
-**Requirement**: None specified  
-**Implementation**: No NAT Gateway - all AWS service access via VPC endpoints  
-**Justification**:
-- **Cost Optimization**: Saves ~$32/month per NAT Gateway (no data transfer charges)
-- **Security**: No egress internet access from pods (reduced attack surface)
-- **Performance**: VPC endpoints provide faster access to AWS services
-- **Zero Trust Alignment**: Private-only communication aligns with ZTA principles
-
-### Workspace Access Pattern
-**Requirement**: None specified  
-**Implementation**: Workspaces are backend-managed pods, not directly routed via ALB  
-**Justification**:
-- **Current Phase**: Focus on automated provisioning (Phase 2 core assignment)
-- **Future Enhancement**: Workspace routing can be added via Ingress in Phase 3
-- **Security**: Prevents direct user access to workspace pods before proper authentication
-
----
-
-## Cost Optimization
-
-| Resource | Monthly Cost (Estimate) | Optimization |
-|----------|------------------------|--------------|
-| EKS Cluster | $72 | Required (control plane) |
-| EC2 Nodes (3x t3.medium) | ~$90 | Right-sized for workload |
-| NAT Gateway | **$0** | ✅ Eliminated via VPC endpoints |
-| VPC Endpoints | ~$22 | Required for private access |
-| DynamoDB On-Demand | ~$5 | Pay-per-request |
-| ALB | ~$16 | Required for ingress |
-| **Total** | **~$205/month** | **$32/month saved** vs NAT |
+## CI/CD Pipeline
 
 ```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    GitHub Actions Workflow                           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Trigger: workflow_dispatch (manual) or push to main                │
+│                                                                      │
+│  ┌─────────────────┐                                                │
+│  │ 1. Validate     │  Terraform fmt, validate, kubeconform          │
+│  └────────┬────────┘                                                │
+│           ▼                                                          │
+│  ┌─────────────────┐                                                │
+│  │ 2. Terraform    │  terraform plan                                │
+│  │    Plan         │                                                │
+│  └────────┬────────┘                                                │
+│           ▼                                                          │
+│  ┌─────────────────┐                                                │
+│  │ 3. Terraform    │  terraform apply                               │
+│  │    Apply        │                                                │
+│  └────────┬────────┘                                                │
+│           ▼                                                          │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ 4. Build & Push Images (parallel)                            │    │
+│  │    ┌────────────┐  ┌────────────┐  ┌────────────┐           │    │
+│  │    │ Backend    │  │ Frontend   │  │ Workspace  │           │    │
+│  │    │ Image      │  │ Image      │  │ Image      │           │    │
+│  │    └────────────┘  └────────────┘  └────────────┘           │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│           ▼                                                          │
+│  ┌─────────────────┐                                                │
+│  │ 5. Deploy K8s   │  kubectl apply -f kubernetes/                  │
+│  │    Resources    │  Restart deployments                           │
+│  └────────┬────────┘                                                │
+│           ▼                                                          │
+│  ┌─────────────────┐                                                │
+│  │ 6. Post-Deploy  │  Health checks, API tests                      │
+│  │    Tests        │                                                │
+│  └─────────────────┘                                                │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Cost Breakdown
+
+| Resource | Monthly Cost | Notes |
+|----------|--------------|-------|
+| EKS Control Plane | $72 | Fixed cost |
+| EC2 Nodes (3x t3.medium) | ~$90 | On-demand pricing |
+| NAT Gateway | **$0** | Eliminated via VPC endpoints |
+| VPC Endpoints | ~$22 | 5 interface endpoints |
+| DynamoDB | ~$5 | On-demand, low usage |
+| Network Load Balancers | ~$50 | 1 per workspace + HR portal |
+| Directory Service | ~$73 | Managed AD (unused!) |
+| ECR | ~$2 | Image storage |
+| **Total** | **~$314/month** | |
+
+**Note**: Directory Service is the biggest waste - it costs $73/month but isn't integrated.
+
+---
+
+## What Would Complete Integration Look Like?
+
+To fully implement AD + IAM roles:
+
+### 1. AD Authentication in Workspaces
+```dockerfile
+# Add to workspace Dockerfile:
+RUN apt-get install -y sssd sssd-ad realmd adcli
+# Configure SSSD to join innovatech.local
+# Users would then login with AD credentials
+```
+
+### 2. IAM Role Assumption
+```yaml
+# Add ServiceAccount with IRSA:
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: developer-workspace
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::920120424621:role/developer-role
+```
+
+### 3. SAML Federation
+- Configure AWS IAM Identity Provider
+- Map AD groups to IAM roles
+- Users assume roles via AD login
+
+---
+
+## Security Considerations
+
+### Current Security Posture
+
+| Aspect | Status | Risk |
+|--------|--------|------|
+| Network Isolation | ✅ Good | Pods in private subnets |
+| VPC Endpoints | ✅ Good | No NAT, reduced attack surface |
+| HTTPS/TLS | ❌ Missing | LoadBalancers on HTTP only |
+| Authentication | ⚠️ Weak | Generated passwords, no MFA |
+| Authorization | ⚠️ Weak | All workspaces same permissions |
+| Secrets Management | ⚠️ Basic | K8s secrets, not AWS Secrets Manager |
+| Audit Logging | ⚠️ Basic | CloudWatch logs only |
+
+### Recommendations
+
+1. Enable HTTPS on LoadBalancers with ACM certificates
+2. Integrate AD for centralized authentication
+3. Implement IRSA for workspace pods
+4. Use AWS Secrets Manager for credentials
+5. Enable AWS CloudTrail for audit logging
+
+---
+
+## Conclusion
+
+The infrastructure is **partially complete**:
+- ✅ Workspace provisioning works
+- ✅ Browser-based desktop access works
+- ✅ IAM roles and AD are deployed
+- ❌ AD and IAM roles are NOT integrated with workspaces
+
+The system demonstrates cloud-native architecture but lacks enterprise identity integration.
