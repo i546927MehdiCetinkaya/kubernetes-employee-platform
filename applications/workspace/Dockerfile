@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     # Desktop environment
     xfce4 \
     xfce4-goodies \
+    xfce4-terminal \
     tightvncserver \
     novnc \
     websockify \
@@ -30,7 +31,9 @@ RUN apt-get update && apt-get install -y \
     git \
     vim \
     nano \
+    # Browsers
     firefox \
+    # Development tools
     python3 \
     python3-pip \
     nodejs \
@@ -43,6 +46,13 @@ RUN apt-get update && apt-get install -y \
     xfonts-75dpi \
     fonts-liberation \
     fonts-dejavu \
+    # SSH/Network tools
+    putty \
+    putty-tools \
+    openssh-client \
+    # AWS CLI
+    awscli \
+    unzip \
     # Active Directory / SSSD packages
     sssd \
     sssd-ad \
@@ -57,6 +67,12 @@ RUN apt-get update && apt-get install -y \
     oddjob \
     oddjob-mkhomedir \
     && rm -rf /var/lib/apt/lists/*
+
+# Install AWS CLI v2 (more up-to-date than apt version)
+RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm -rf awscliv2.zip aws
 
 # Pre-configure Kerberos (non-interactive)
 RUN echo "krb5-config krb5-config/default_realm string ${AD_REALM}" | debconf-set-selections && \
