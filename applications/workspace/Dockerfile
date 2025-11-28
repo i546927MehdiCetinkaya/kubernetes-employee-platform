@@ -94,13 +94,13 @@ RUN mkdir -p /home/${USER}/.vnc && \
 # Copy SSSD configuration template
 COPY sssd.conf.template /etc/sssd/sssd.conf.template
 
-# Copy AD join script
+# Copy AD join script and fix line endings
 COPY join-ad.sh /join-ad.sh
-RUN chmod +x /join-ad.sh
+RUN sed -i 's/\r$//' /join-ad.sh && chmod +x /join-ad.sh
 
-# Create startup script with AD support
+# Create startup script with AD support and fix line endings
 COPY startup.sh /startup.sh
-RUN chmod +x /startup.sh
+RUN sed -i 's/\r$//' /startup.sh && chmod +x /startup.sh
 
 # Create workspace directory
 RUN mkdir -p /home/${USER}/workspace && chown -R ${USER}:${USER} /home/${USER}/workspace
