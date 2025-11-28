@@ -110,61 +110,60 @@ async function provisionWorkspace(employee) {
       throw serviceError;
     }
     
-    // 6. Use placeholder URL initially (LoadBalancer takes 2-5 minutes)
-    const workspaceUrl = `http://${workspaceName}.workspaces.svc.cluster.local`;
+    // 5. Wait for LoadBalancer URL (up to 2 minutes)
+    logger.info(`Step 5: Waiting for LoadBalancer URL...`);
+    const workspaceUrl = await getLoadBalancerURLFast(workspaceName);
+    logger.info(`Step 5: LoadBalancer URL obtained: ${workspaceUrl}`);
     
-    // 7. Save workspace metadata to DynamoDB
+    // 6. Save workspace metadata to DynamoDB with real URL
     const workspace = {
       workspaceId,
       employeeId: employee.employeeId,
       name: workspaceName,
       url: workspaceUrl,
-      status: 'provisioning',
+      status: 'active',
       createdAt: new Date().toISOString(),
       credentials: {
         username: 'coder',
-        password: temporaryPassword // Include password in response for testing
+        password: temporaryPassword
       }
     };
     
     try {
       await dynamodbService.createWorkspace(workspace);
-      logger.info(`Step 7: Workspace metadata saved to DynamoDB`);
+      logger.info(`Step 6: Workspace metadata saved to DynamoDB`);
     } catch (dbError) {
-      logger.warn(`Step 7 failed (DynamoDB): ${dbError.message}, continuing...`);
+      logger.warn(`Step 6 failed (DynamoDB): ${dbError.message}, continuing...`);
     }
     
-    // 8. Store workspace metadata in SSM (optional)
+    // 7. Store workspace metadata in SSM (optional)
     try {
       await ssmService.storeWorkspaceMetadata(workspace);
-      logger.info(`Step 8: Workspace metadata stored in SSM`);
+      logger.info(`Step 7: Workspace metadata stored in SSM`);
     } catch (ssmMetaError) {
-      logger.warn(`Step 8 failed (SSM Metadata): ${ssmMetaError.message}, continuing...`);
+      logger.warn(`Step 7 failed (SSM Metadata): ${ssmMetaError.message}, continuing...`);
     }
     
-    // 9. Store audit log (optional)
+    // 8. Store audit log (optional)
     try {
       await ssmService.storeAuditLog('workspace_provisioned', employee.employeeId, {
         workspaceId,
         workspaceName,
         workspaceUrl
       });
-      logger.info(`Step 9: Audit log stored`);
+      logger.info(`Step 8: Audit log stored`);
     } catch (auditError) {
-      logger.warn(`Step 9 failed (Audit): ${auditError.message}, continuing...`);
+      logger.warn(`Step 8 failed (Audit): ${auditError.message}, continuing...`);
     }
     
-    // 10. ASYNCHRONOUSLY: Wait for LoadBalancer URL and send email
-    getLoadBalancerURLAndSendEmail(workspaceName, employee, workspace, temporaryPassword);
+    // 9. Send welcome email (async, don't wait)
+    emailService.sendWelcomeEmail(employee, workspace, temporaryPassword)
+      .then(result => logger.info(`Welcome email sent to ${employee.email}`))
+      .catch(err => logger.warn(`Failed to send welcome email: ${err.message}`));
     
     logger.info(`Workspace provisioned: ${workspaceId} for employee ${employee.employeeId}`);
-    logger.info(`LoadBalancer URL will be determined asynchronously (2-5 minutes)`);
-    logger.info(`Temporary password stored in SSM Parameter Store`);
     
-    return {
-      ...workspace,
-      message: 'Workspace provisioning started. Welcome email will be sent once LoadBalancer is ready.'
-    };
+    return workspace;
   } catch (error) {
     logger.error(`Error provisioning workspace for ${employee.employeeId}:`, error);
     // Cleanup on error
@@ -489,6 +488,39 @@ async function getLoadBalancerURL(name) {
   // Fallback if LoadBalancer is not ready yet
   logger.warn(`LoadBalancer not ready after ${maxRetries} retries for ${name}`);
   return `http://${name}.${WORKSPACE_NAMESPACE}.svc.cluster.local`;
+}
+
+/**
+ * Fast version of getLoadBalancerURL - waits up to 2 minutes with shorter intervals
+ */
+async function getLoadBalancerURLFast(name) {
+  const maxRetries = 24; // Wait up to 2 minutes (24 * 5 seconds)
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const service = await k8sApi.readNamespacedService(name, WORKSPACE_NAMESPACE);
+      const loadBalancer = service.body.status?.loadBalancer;
+      
+      if (loadBalancer?.ingress && loadBalancer.ingress.length > 0) {
+        const hostname = loadBalancer.ingress[0].hostname || loadBalancer.ingress[0].ip;
+        if (hostname) {
+          logger.info(`LoadBalancer URL ready after ${i * 5} seconds: ${hostname}`);
+          return `http://${hostname}`;
+        }
+      }
+    } catch (error) {
+      logger.warn(`Error checking LoadBalancer status (attempt ${i+1}): ${error.message}`);
+    }
+    
+    if (i < maxRetries - 1) {
+      logger.info(`Waiting for LoadBalancer... (${(i+1) * 5}s / 120s)`);
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+    }
+  }
+  
+  // If still not ready, throw error instead of using local URL
+  throw new Error(`LoadBalancer not ready after 2 minutes for ${name}. Please try again later.`);
+}
 }
 
 /**

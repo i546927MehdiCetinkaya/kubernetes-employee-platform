@@ -185,7 +185,7 @@ router.delete('/debug/cleanup/:name', async (req, res) => {
   }
 });
 
-// Sync DynamoDB with K8s - remove stale entries
+// Sync DynamoDB with K8s - remove stale entries and update URLs/passwords
 router.post('/debug/sync', async (req, res) => {
   try {
     const k8s = require('@kubernetes/client-node');
@@ -204,6 +204,23 @@ router.post('/debug/sync', async (req, res) => {
       if (svc.status.loadBalancer && svc.status.loadBalancer.ingress && svc.status.loadBalancer.ingress[0]) {
         const hostname = svc.status.loadBalancer.ingress[0].hostname;
         serviceUrls[svc.metadata.name] = `http://${hostname}`;
+      }
+    }
+    
+    // Get secrets with passwords
+    const secretPasswords = {};
+    for (const podName of runningPodNames) {
+      try {
+        const secret = await k8sApi.readNamespacedSecret(`${podName}-secret`, 'workspaces');
+        if (secret.body.data) {
+          // Try vnc-password first, then password
+          const pwdData = secret.body.data['vnc-password'] || secret.body.data['password'];
+          if (pwdData) {
+            secretPasswords[podName] = Buffer.from(pwdData, 'base64').toString();
+          }
+        }
+      } catch (e) {
+        // Secret might not exist
       }
     }
     
@@ -232,21 +249,31 @@ router.post('/debug/sync', async (req, res) => {
       let foundMatch = false;
       
       for (const ws of employeeWorkspaces) {
-        // Check if this workspace URL matches a running service
-        const serviceUrl = serviceUrls[ws.name];
-        const urlMatches = serviceUrl && ws.url && ws.url.includes(serviceUrl.split('://')[1].split('.')[0]);
-        
         if (runningPodNames.has(ws.name) && !foundMatch) {
           // First matching workspace for this employee - keep it
           foundMatch = true;
+          
+          const serviceUrl = serviceUrls[ws.name];
+          const secretPassword = secretPasswords[ws.name];
+          
+          // Check what needs updating
+          const updates = {};
           if (ws.status !== 'active') {
-            // Also update the URL to the current service URL if available
-            const updates = { status: 'active' };
-            if (serviceUrl) {
-              updates.url = serviceUrl;
-            }
+            updates.status = 'active';
+          }
+          if (serviceUrl && ws.url !== serviceUrl) {
+            updates.url = serviceUrl;
+          }
+          if (secretPassword && ws.credentials?.password !== secretPassword) {
+            updates.credentials = {
+              username: 'coder',
+              password: secretPassword
+            };
+          }
+          
+          if (Object.keys(updates).length > 0) {
             await dynamodbService.updateWorkspace(ws.workspaceId, updates);
-            results.updated.push({ name: ws.name, workspaceId: ws.workspaceId });
+            results.updated.push({ name: ws.name, workspaceId: ws.workspaceId, updates: Object.keys(updates) });
           }
           results.kept.push({ name: ws.name, workspaceId: ws.workspaceId });
         } else {
