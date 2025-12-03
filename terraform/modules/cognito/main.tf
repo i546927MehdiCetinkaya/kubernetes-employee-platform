@@ -88,8 +88,8 @@ resource "aws_cognito_user_pool" "main" {
 
   # Admin Create User Config
   admin_create_user_config {
-    allow_admin_create_user_only = true  # Only admins can create users
-    
+    allow_admin_create_user_only = true # Only admins can create users
+
     invite_message_template {
       email_subject = "Welcome to Innovatech - Your Account"
       email_message = "Hello {username}, your temporary password is {####}. Please change it upon first login."
@@ -175,9 +175,9 @@ resource "aws_cognito_user_pool_client" "hr_portal" {
   supported_identity_providers = ["COGNITO"]
 
   # Token Validity
-  access_token_validity  = 1   # 1 hour
-  id_token_validity      = 1   # 1 hour
-  refresh_token_validity = 24  # 24 hours
+  access_token_validity  = 1  # 1 hour
+  id_token_validity      = 1  # 1 hour
+  refresh_token_validity = 24 # 24 hours
 
   token_validity_units {
     access_token  = "hours"
@@ -214,9 +214,9 @@ resource "aws_cognito_user_pool_client" "workspace" {
   supported_identity_providers = ["COGNITO"]
 
   # Token Validity - Shorter for workspaces
-  access_token_validity  = 1   # 1 hour
-  id_token_validity      = 1   # 1 hour
-  refresh_token_validity = 8   # 8 hours (work day)
+  access_token_validity  = 1 # 1 hour
+  id_token_validity      = 1 # 1 hour
+  refresh_token_validity = 8 # 8 hours (work day)
 
   token_validity_units {
     access_token  = "hours"

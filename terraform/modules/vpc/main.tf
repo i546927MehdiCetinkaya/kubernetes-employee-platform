@@ -172,7 +172,7 @@ resource "aws_instance" "nat" {
   subnet_id                   = aws_subnet.public[0].id
   vpc_security_group_ids      = [aws_security_group.nat_instance.id]
   iam_instance_profile        = aws_iam_instance_profile.nat_instance.name
-  source_dest_check           = false  # Required for NAT
+  source_dest_check           = false # Required for NAT
   associate_public_ip_address = true
 
   # Enable detailed monitoring for security
@@ -227,7 +227,7 @@ resource "aws_instance" "nat" {
 
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required"  # IMDSv2 required for security
+    http_tokens                 = "required" # IMDSv2 required for security
     http_put_response_hop_limit = 1
   }
 
@@ -295,7 +295,7 @@ resource "aws_route" "private_nat" {
 
   route_table_id         = aws_route_table.private[count.index].id
   destination_cidr_block = "0.0.0.0/0"
-  
+
   # Use NAT Instance if enabled, otherwise use NAT Gateway
   network_interface_id = var.use_nat_instance ? aws_instance.nat[0].primary_network_interface_id : null
   nat_gateway_id       = var.use_nat_instance ? null : aws_nat_gateway.main[count.index].id

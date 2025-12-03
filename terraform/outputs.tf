@@ -225,11 +225,11 @@ output "workspace_internal_alb_sg_id" {
 output "zero_trust_summary" {
   description = "Summary of Zero Trust configuration"
   value = {
-    nat_type                = var.use_nat_instance ? "NAT Instance" : "NAT Gateway"
-    hr_portal_access        = "Internal ALB only (VPC + Corporate CIDR)"
-    workspace_access        = "Internal ALB only (VPC + Corporate CIDR)"
-    authentication          = "AWS Cognito with MFA"
-    network_isolation       = "VPC Endpoints for AWS services"
-    workspace_isolation     = "Per-employee network policies"
+    nat_type            = var.use_nat_instance ? "NAT Instance" : "NAT Gateway"
+    hr_portal_access    = "Internal ALB only (VPC + Corporate CIDR)"
+    workspace_access    = "Internal ALB only (VPC + Corporate CIDR)"
+    authentication      = "AWS Cognito with MFA"
+    network_isolation   = "VPC Endpoints for AWS services"
+    workspace_isolation = "Per-employee network policies"
   }
 }

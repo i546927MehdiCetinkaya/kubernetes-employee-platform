@@ -98,9 +98,9 @@ resource "aws_security_group" "eks_nodes_zero_trust" {
 
   # Allow inbound from internal ALBs only
   ingress {
-    from_port       = 8080
-    to_port         = 8080
-    protocol        = "tcp"
+    from_port = 8080
+    to_port   = 8080
+    protocol  = "tcp"
     security_groups = [
       aws_security_group.hr_portal_internal_alb.id,
       aws_security_group.workspace_internal_alb.id
@@ -119,10 +119,10 @@ resource "aws_security_group" "eks_nodes_zero_trust" {
 
   # Allow node-to-node communication
   ingress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-    self      = true
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
     description = "Allow node-to-node communication"
   }
 
