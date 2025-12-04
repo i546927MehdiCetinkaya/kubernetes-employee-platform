@@ -1,11 +1,11 @@
 # Script to update Kubernetes manifests with Terraform outputs
 # This ensures that the Ingress resources have the correct ARNs and IDs for Zero Trust
 
-$ErrorActionPreference = "Stop"
-
 param (
     [string]$OutputsFile = ""
 )
+
+$ErrorActionPreference = "Stop"
 
 Write-Host "Fetching Terraform outputs..."
 
