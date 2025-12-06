@@ -46,16 +46,16 @@ const WORKSPACE_NAMESPACE = 'workspaces';
 const ECR_REGISTRY = process.env.ECR_REGISTRY || '920120424621.dkr.ecr.eu-west-1.amazonaws.com';
 const AD_DOMAIN = process.env.AD_DOMAIN || 'innovatech.local';
 
-// Department to image mapping (Kasm-based workspace images)
+// Department to image mapping (using official Kasm images for faster startup)
 const DEPARTMENT_IMAGES = {
-  'infra': `${ECR_REGISTRY}/workspace-infra:latest`,
-  'infrastructure': `${ECR_REGISTRY}/workspace-infra:latest`,
-  'dev': `${ECR_REGISTRY}/workspace-dev:latest`,
-  'development': `${ECR_REGISTRY}/workspace-dev:latest`,
-  'developer': `${ECR_REGISTRY}/workspace-dev:latest`,
-  'hr': `${ECR_REGISTRY}/workspace-hr:latest`,
-  'human_resources': `${ECR_REGISTRY}/workspace-hr:latest`,
-  'default': `${ECR_REGISTRY}/workspace-hr:latest`
+  'infra': 'kasmweb/desktop:1.14.0',
+  'infrastructure': 'kasmweb/desktop:1.14.0',
+  'dev': 'kasmweb/desktop:1.14.0',
+  'development': 'kasmweb/desktop:1.14.0',
+  'developer': 'kasmweb/desktop:1.14.0',
+  'hr': 'kasmweb/desktop:1.14.0',
+  'human_resources': 'kasmweb/desktop:1.14.0',
+  'default': 'kasmweb/desktop:1.14.0'
 };
 
 // Department resource configurations
