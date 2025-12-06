@@ -154,8 +154,8 @@ function App() {
     }
   };
 
-  // Track which employees are currently provisioning
-  const [provisioningEmployees, setProvisioningEmployees] = useState(new Set());
+  // Track which employees are currently provisioning with status
+  const [provisioningEmployees, setProvisioningEmployees] = useState(new Map());
 
   const handleProvisionWorkspace = async (employeeId) => {
     // Prevent double-click and duplicate provisioning
@@ -171,24 +171,45 @@ function App() {
       return;
     }
 
-    setProvisioningEmployees(prev => new Set([...prev, employeeId]));
+    setProvisioningEmployees(prev => new Map(prev).set(employeeId, 'Starting provisioning...'));
     setError(null);
+    setSuccess(null);
     
     try {
+      // Update status: Creating Kubernetes resources
+      setProvisioningEmployees(prev => new Map(prev).set(employeeId, 'Creating Kubernetes pod and service...'));
+      
       const response = await axios.post(`${API_BASE_URL}/api/workspaces/provision/${employeeId}`);
       const workspace = response.data.workspace;
+      
+      // Update status: DNS configuration
+      setProvisioningEmployees(prev => new Map(prev).set(employeeId, 'Configuring DNS record...'));
+      
       setNewWorkspace(workspace);
-      setSuccess(`Workspace provisioned successfully! DNS: ${workspace.dnsName || 'pending'}`);
+      setSuccess(`✓ Workspace provisioned successfully! Access: ${workspace.dnsName || workspace.url}`);
+      
+      // Refresh workspaces list
       await fetchWorkspaces();
+      
+      // Show success for 3 seconds before removing status
+      setTimeout(() => {
+        setProvisioningEmployees(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(employeeId);
+          return newMap;
+        });
+      }, 3000);
+      
     } catch (err) {
       const errorMsg = err.response?.data?.error || err.message;
-      setError(`Failed to provision workspace: ${errorMsg}`);
+      setError(`✗ Failed to provision workspace: ${errorMsg}`);
       console.error('Error provisioning workspace:', err);
-    } finally {
+      
+      // Remove from provisioning state immediately on error
       setProvisioningEmployees(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(employeeId);
-        return newSet;
+        const newMap = new Map(prev);
+        newMap.delete(employeeId);
+        return newMap;
       });
     }
   };
@@ -486,13 +507,19 @@ function App() {
                                   </Button>
                                 </Box>
                               ) : provisioningEmployees.has(employee.employeeId) ? (
-                                <Box sx={{ bgcolor: 'warning.light', p: 1.5, borderRadius: 1 }}>
-                                  <Box display="flex" alignItems="center" gap={1}>
-                                    <CircularProgress size={16} />
-                                    <Typography variant="caption" color="warning.dark" fontWeight="bold">
-                                      Provisioning workspace... This may take 2-5 minutes.
+                                <Box sx={{ bgcolor: 'info.light', p: 2, borderRadius: 1 }}>
+                                  <Box display="flex" alignItems="center" gap={1} mb={1}>
+                                    <CircularProgress size={20} thickness={5} />
+                                    <Typography variant="body2" color="info.dark" fontWeight="bold">
+                                      Provisioning Workspace
                                     </Typography>
                                   </Box>
+                                  <Typography variant="caption" color="info.dark" display="block" sx={{ pl: 3.5 }}>
+                                    {provisioningEmployees.get(employee.employeeId)}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" display="block" sx={{ pl: 3.5, mt: 0.5 }}>
+                                    This may take 2-5 minutes. Please wait...
+                                  </Typography>
                                 </Box>
                               ) : (
                                 <Button
@@ -501,9 +528,14 @@ function App() {
                                   color="primary"
                                   startIcon={<ComputerIcon />}
                                   onClick={() => handleProvisionWorkspace(employee.employeeId)}
-                                  disabled={loading || provisioningEmployees.size > 0}
+                                  disabled={loading || provisioningEmployees.size > 0 || provisioningEmployees.has(employee.employeeId)}
+                                  sx={{
+                                    pointerEvents: provisioningEmployees.size > 0 ? 'none' : 'auto'
+                                  }}
                                 >
-                                  Provision Workspace
+                                  {provisioningEmployees.size > 0 && !provisioningEmployees.has(employee.employeeId) 
+                                    ? 'Provisioning in progress...' 
+                                    : 'Provision Workspace'}
                                 </Button>
                               )}
                             </CardContent>
