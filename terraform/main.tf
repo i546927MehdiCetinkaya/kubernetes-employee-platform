@@ -270,8 +270,8 @@ module "openvpn" {
   admin_password   = var.openvpn_admin_password
   domain_name      = var.domain_name
   # Use VPC DNS - actual service IPs will be resolved via Route53 private zone
-  hr_portal_ip     = cidrhost(var.vpc_cidr, 100) # Placeholder, will use Route53
-  api_ip           = cidrhost(var.vpc_cidr, 101) # Placeholder, will use Route53
+  hr_portal_ip = cidrhost(var.vpc_cidr, 100) # Placeholder, will use Route53
+  api_ip       = cidrhost(var.vpc_cidr, 101) # Placeholder, will use Route53
 
   depends_on = [module.vpc]
 }

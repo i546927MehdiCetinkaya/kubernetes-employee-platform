@@ -155,15 +155,15 @@ resource "aws_instance" "openvpn" {
   }
 
   user_data = base64encode(templatefile("${path.module}/user-data.sh", {
-    project_name     = var.project_name
-    domain_name      = var.domain_name
-    vpc_cidr         = var.vpc_cidr
-    vpn_client_cidr  = var.vpn_client_cidr
-    dns_server       = cidrhost(var.vpc_cidr, 2)
-    hr_portal_ip     = var.hr_portal_ip
-    api_ip           = var.api_ip
-    hosted_zone_id   = aws_route53_zone.private.zone_id
-    admin_password   = var.admin_password
+    project_name    = var.project_name
+    domain_name     = var.domain_name
+    vpc_cidr        = var.vpc_cidr
+    vpn_client_cidr = var.vpn_client_cidr
+    dns_server      = cidrhost(var.vpc_cidr, 2)
+    hr_portal_ip    = var.hr_portal_ip
+    api_ip          = var.api_ip
+    hosted_zone_id  = aws_route53_zone.private.zone_id
+    admin_password  = var.admin_password
   }))
 
   tags = {

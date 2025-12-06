@@ -8,7 +8,7 @@ on:
     paths:
       - 'terraform/**'
       - 'kubernetes/**'
-      - 'applications/**'
+      - 'applications/workspace/**'
       - '.github/workflows/deploy.yml'
 
 env:
