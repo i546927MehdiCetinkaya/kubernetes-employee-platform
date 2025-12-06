@@ -49,21 +49,107 @@ flowchart LR
 
 ## ⚡ Quick Start
 
-### 🌐 HR Portal URL
+### 🌐 Access Requirements
+
+#### 1️⃣ **VPN Connection** (Required for workspace access)
+```
+OpenVPN Server: 54.195.44.238
+Config: Download from HR Portal or administrator
+```
+
+#### 2️⃣ **HR Portal URL** (Public access)
 ```
 http://ac0cd11d903e646dc890a3606c5999df-8a0c923d8bfa6cfe.elb.eu-west-1.amazonaws.com
 ```
 
-### 📝 Create Employee Workspace
-1. **Employees** → Add Employee (name, email, department, role)
-2. **Provision Workspace** → Wait ~2 min
-3. **Workspaces** → Open Desktop + copy password
+### 📝 Employee Onboarding Workflow
+
+#### **For HR Administrators:**
+1. **Login** → HR Portal with Cognito credentials
+2. **Create Employee** → Fill in: First Name, Last Name, Email, Department, Role
+3. **Provision Workspace** → Click "Provision Workspace" (wait ~2 min)
+4. **Share Credentials** → Give employee VPN config + workspace URL + password
+
+#### **For Employees:**
+1. **Connect VPN** → Use OpenVPN client with provided config
+2. **Access Workspace** → Navigate to personal URL: `https://firstname.lastname.innovatech.local:PORT`
+3. **Login** → Use provided password
+4. **Work** → Full Ubuntu desktop with Firefox, Terminal, AWS CLI, PuTTY
+
+### 🔗 Personal Workspace URLs
+
+Each employee gets a **personal DNS record**:
+```
+Format: https://{firstname}.{lastname}.innovatech.local:{port}
+Example: https://john.doe.innovatech.local:30123
+
+✅ Automatic DNS record creation in Route53
+✅ No more localhost:6901 port-forwards
+✅ Production-ready URLs
+✅ Automatic cleanup on deprovision
+```
 
 ---
 
 ## 🏗️ Architecture
 
 📖 **Detailed docs**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+### 🔄 Workspace Provisioning Flow
+
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+sequenceDiagram
+    participant HR as 👤 HR User
+    participant Portal as 🌐 Frontend
+    participant API as ⚡ Backend
+    participant DDB as 💾 DynamoDB
+    participant K8S as ☸️ Kubernetes
+    participant R53 as 🌐 Route53
+    participant WS as 🖥️ Workspace Pod
+    
+    HR->>Portal: Create Employee
+    Portal->>API: POST /employees
+    API->>DDB: Store employee data
+    API-->>Portal: Employee created
+    
+    HR->>Portal: Provision Workspace
+    Portal->>API: POST /workspaces
+    API->>DDB: Check for duplicates
+    API->>K8S: Create Pod + Service
+    K8S->>WS: Start container
+    WS-->>K8S: Ready (200 OK)
+    K8S-->>API: Pod Running + NodePort
+    API->>R53: Create A record (firstname.lastname.innovatech.local)
+    API->>DDB: Store workspace info
+    API-->>Portal: Workspace URL + password
+    Portal-->>HR: Display personal URL
+```
+
+### 🔐 DNS-Based Access Control
+
+```mermaid
+%%{init: {'theme': 'dark'}}%%
+flowchart LR
+    subgraph EMPLOYEE["👤 Employee"]
+        VPN["🔒 OpenVPN Client"]
+        BROWSER["🌐 Browser"]
+    end
+    
+    subgraph AWS["☁️ AWS"]
+        R53["🌐 Route53\ninnovatech.local"]
+        NODE["🖥️ EKS Node"]
+    end
+    
+    VPN -->|Connect| NODE
+    BROWSER -->|1. DNS Query\njohn.doe.innovatech.local| R53
+    R53 -->|2. Returns Node IP\n10.0.58.37| BROWSER
+    BROWSER -->|3. HTTPS:30123| NODE
+    NODE -->|4. Route to Pod| WS["🖥️ Workspace"]
+    
+    style R53 fill:#0ff,color:#000
+    style WS fill:#f60,color:#000
+```
 
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#0ff', 'lineColor': '#f0f'}}}%%
@@ -124,6 +210,40 @@ flowchart TB
 
 ## 🔐 Security Model
 
+### 🛡️ Multi-Layer Security
+
+```mermaid
+%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#f0f', 'lineColor': '#0ff'}}}%%
+flowchart TB
+    subgraph NETWORK["🌐 Network Security"]
+        VPN["🔒 OpenVPN\nVPN Required"]
+        SG["🔥 Security Groups\nPrivate Subnets"]
+    end
+    
+    subgraph K8S["☸️ Kubernetes Security"]
+        NP["🚫 Network Policies\nNamespace Isolation"]
+        IRSA["🎫 IRSA\nNo Static Keys"]
+        RBAC["👮 RBAC\nRole-Based Access"]
+    end
+    
+    subgraph APP["🔐 Application Security"]
+        COG["🔑 Cognito\nHR Authentication"]
+        DNS["🌐 Route53\nPrivate DNS Zone"]
+    end
+    
+    VPN --> SG
+    SG --> NP
+    NP --> IRSA
+    IRSA --> RBAC
+    COG --> DNS
+    
+    style VPN fill:#f0f,color:#fff
+    style IRSA fill:#0ff,color:#000
+    style COG fill:#0f0,color:#000
+```
+
+### 📋 Department-Based Permissions (IRSA)
+
 ```mermaid
 %%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#f0f', 'lineColor': '#0ff'}}}%%
 flowchart LR
@@ -138,12 +258,13 @@ flowchart LR
         S3["📁 S3"]
         SSM["🔧 SSM"]
         DDB["💾 DynamoDB"]
+        R53["🌐 Route53"]
     end
     
     DEV --> S3
-    HR --> DDB
+    HR --> DDB & R53
     MGR --> S3 & SSM
-    ADM --> S3 & SSM & DDB
+    ADM --> S3 & SSM & DDB & R53
     
     style DEV fill:#0ff,stroke:#0ff,color:#000
     style HR fill:#0f0,stroke:#0f0,color:#000
@@ -151,12 +272,18 @@ flowchart LR
     style ADM fill:#f0f,stroke:#f0f,color:#000
 ```
 
-| Feature | Status |
-|---------|--------|
-| **IRSA** | ✅ No static credentials |
-| **Network Policies** | ✅ Namespace isolation |
-| **Private Subnets** | ✅ Pods protected |
-| **AD Integration** | ⚠️ Ready (innovatech.local) |
+### ✅ Security Features
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **VPN Access** | ✅ | OpenVPN required for workspace access |
+| **Private DNS** | ✅ | Route53 Private Hosted Zone (innovatech.local) |
+| **IRSA** | ✅ | No static credentials in containers |
+| **Network Policies** | ✅ | Namespace isolation in Kubernetes |
+| **Private Subnets** | ✅ | All pods in private subnets (10.0.64.0/19, 10.0.96.0/19) |
+| **Cognito Auth** | ✅ | HR Portal authentication |
+| **AD Integration** | ⚠️ | Ready (innovatech.local) - Not yet in use |
+| **Duplicate Prevention** | ✅ | Backend checks prevent multiple workspaces per employee |
 
 ---
 
