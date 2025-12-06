@@ -103,6 +103,36 @@ resource "aws_iam_role_policy_attachment" "hr_portal_ssm" {
   policy_arn = var.ssm_policy_arn
 }
 
+# HR Portal Route53 Policy for personal workspace DNS
+resource "aws_iam_role_policy" "hr_portal_route53" {
+  name = "route53-workspace-dns"
+  role = aws_iam_role.hr_portal.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "Route53WorkspaceDNS"
+        Effect = "Allow"
+        Action = [
+          "route53:ChangeResourceRecordSets",
+          "route53:ListResourceRecordSets"
+        ]
+        Resource = var.route53_zone_arn != "" ? var.route53_zone_arn : "arn:aws:route53:::hostedzone/*"
+      },
+      {
+        Sid    = "Route53ListZones"
+        Effect = "Allow"
+        Action = [
+          "route53:ListHostedZones",
+          "route53:GetHostedZone"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # Workspace Provisioner Service Role
 resource "aws_iam_role" "workspace" {
   name = "${var.cluster_name}-workspace-role"

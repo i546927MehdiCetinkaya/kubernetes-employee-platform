@@ -164,6 +164,7 @@ module "iam" {
   ssm_policy_arn                = module.systems_manager.hr_portal_ssm_policy_arn
   enable_directory_service      = var.enable_directory_service
   directory_id                  = var.enable_directory_service ? module.directory_service[0].directory_id : ""
+  route53_zone_arn              = "arn:aws:route53:::hostedzone/Z0206991D2VAV0U5DTHR"
   environment                   = var.environment
 
   depends_on = [module.eks, module.dynamodb, module.systems_manager]

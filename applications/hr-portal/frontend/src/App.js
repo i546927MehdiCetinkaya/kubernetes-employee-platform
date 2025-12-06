@@ -138,7 +138,7 @@ function App() {
       const response = await axios.get(`${API_BASE_URL}/api/employees`);
       setEmployees(response.data.employees || []);
     } catch (err) {
-      setError(`Failed to fetch employees: ${err.message}`);
+      setError(`Failed to fetch employees: ${err.response?.data?.message || err.message}`);
       console.error('Error fetching employees:', err);
     } finally {
       setLoading(false);
@@ -154,20 +154,42 @@ function App() {
     }
   };
 
+  // Track which employees are currently provisioning
+  const [provisioningEmployees, setProvisioningEmployees] = useState(new Set());
+
   const handleProvisionWorkspace = async (employeeId) => {
-    setLoading(true);
+    // Prevent double-click and duplicate provisioning
+    if (provisioningEmployees.has(employeeId)) {
+      setError('Workspace provisioning is already in progress for this employee.');
+      return;
+    }
+    
+    // Check if employee already has a workspace (frontend check)
+    const existingWorkspace = getEmployeeWorkspace(employeeId);
+    if (existingWorkspace) {
+      setError('Employee already has an active workspace. Delete it first to create a new one.');
+      return;
+    }
+
+    setProvisioningEmployees(prev => new Set([...prev, employeeId]));
     setError(null);
+    
     try {
       const response = await axios.post(`${API_BASE_URL}/api/workspaces/provision/${employeeId}`);
       const workspace = response.data.workspace;
       setNewWorkspace(workspace);
-      setSuccess(`Workspace provisioned successfully!`);
-      fetchWorkspaces();
+      setSuccess(`Workspace provisioned successfully! DNS: ${workspace.dnsName || 'pending'}`);
+      await fetchWorkspaces();
     } catch (err) {
-      setError(`Failed to provision workspace: ${err.response?.data?.error || err.message}`);
+      const errorMsg = err.response?.data?.error || err.message;
+      setError(`Failed to provision workspace: ${errorMsg}`);
       console.error('Error provisioning workspace:', err);
     } finally {
-      setLoading(false);
+      setProvisioningEmployees(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(employeeId);
+        return newSet;
+      });
     }
   };
 
@@ -177,7 +199,7 @@ function App() {
     try {
       await axios.delete(`${API_BASE_URL}/api/workspaces/${employeeId}`);
       setSuccess('Workspace deleted successfully!');
-      fetchWorkspaces();
+      await fetchWorkspaces();
     } catch (err) {
       setError(`Failed to delete workspace: ${err.response?.data?.error || err.message}`);
     } finally {
@@ -186,8 +208,10 @@ function App() {
   };
 
   const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    setSuccess('Copied to clipboard!');
+    if (text) {
+      navigator.clipboard.writeText(text);
+      setSuccess('Copied to clipboard!');
+    }
   };
 
   const getEmployeeName = (employeeId) => {
@@ -197,6 +221,16 @@ function App() {
 
   const getEmployeeWorkspace = (employeeId) => {
     return workspaces.find(w => w.employeeId === employeeId);
+  };
+  
+  // Get unique workspaces (one per employee)
+  const getUniqueWorkspaces = () => {
+    const seen = new Set();
+    return workspaces.filter(w => {
+      if (seen.has(w.employeeId)) return false;
+      seen.add(w.employeeId);
+      return true;
+    });
   };
 
   const handleCreateEmployee = async () => {
@@ -451,6 +485,15 @@ function App() {
                                     View Credentials
                                   </Button>
                                 </Box>
+                              ) : provisioningEmployees.has(employee.employeeId) ? (
+                                <Box sx={{ bgcolor: 'warning.light', p: 1.5, borderRadius: 1 }}>
+                                  <Box display="flex" alignItems="center" gap={1}>
+                                    <CircularProgress size={16} />
+                                    <Typography variant="caption" color="warning.dark" fontWeight="bold">
+                                      Provisioning workspace... This may take 2-5 minutes.
+                                    </Typography>
+                                  </Box>
+                                </Box>
                               ) : (
                                 <Button
                                   fullWidth
@@ -458,7 +501,7 @@ function App() {
                                   color="primary"
                                   startIcon={<ComputerIcon />}
                                   onClick={() => handleProvisionWorkspace(employee.employeeId)}
-                                  disabled={loading}
+                                  disabled={loading || provisioningEmployees.size > 0}
                                 >
                                   Provision Workspace
                                 </Button>
@@ -484,7 +527,7 @@ function App() {
                       Workspaces
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Active Linux Desktops: {workspaces.length}
+                      Active Linux Desktops: {getUniqueWorkspaces().length}
                     </Typography>
                   </Box>
                   <Button
@@ -499,7 +542,7 @@ function App() {
               </Paper>
 
               <Grid container spacing={3}>
-                {workspaces.length === 0 ? (
+                {getUniqueWorkspaces().length === 0 ? (
                   <Grid item xs={12}>
                     <Paper sx={{ p: 4, textAlign: 'center' }}>
                       <ComputerIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
@@ -512,7 +555,7 @@ function App() {
                     </Paper>
                   </Grid>
                 ) : (
-                  workspaces.map((workspace) => (
+                  getUniqueWorkspaces().map((workspace) => (
                     <Grid item xs={12} md={6} key={workspace.workspaceId}>
                       <Card elevation={3}>
                         <CardContent>
@@ -520,11 +563,14 @@ function App() {
                             <Box>
                               <Typography variant="h6" gutterBottom>
                                 <ComputerIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                                {workspace.name}
+                                {workspace.dnsName || workspace.name}
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
                                 Employee: {getEmployeeName(workspace.employeeId)}
                               </Typography>
+                              {workspace.department && (
+                                <Chip label={workspace.department} size="small" sx={{ mt: 0.5 }} />
+                              )}
                             </Box>
                             <Chip
                               label={workspace.status}
@@ -539,23 +585,44 @@ function App() {
                               🔐 Login Credentials
                             </Typography>
                             
+                            {/* Personal DNS URL */}
+                            {workspace.dnsName && (
+                              <Box sx={{ mb: 1.5, p: 1, bgcolor: 'success.light', borderRadius: 1 }}>
+                                <Typography variant="caption" color="success.dark" fontWeight="bold">
+                                  Personal Workspace URL (VPN Required):
+                                </Typography>
+                                <Box display="flex" alignItems="center" gap={1}>
+                                  <Typography variant="body2" fontWeight="bold" sx={{ wordBreak: 'break-all', flex: 1 }}>
+                                    https://{workspace.dnsName}:{workspace.nodePort}
+                                  </Typography>
+                                  <Tooltip title="Copy URL">
+                                    <IconButton size="small" onClick={() => copyToClipboard(`https://${workspace.dnsName}:${workspace.nodePort}`)}>
+                                      <CopyIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                </Box>
+                              </Box>
+                            )}
+                            
                             <Box sx={{ mb: 1 }}>
-                              <Typography variant="caption" color="text.secondary">URL:</Typography>
+                              <Typography variant="caption" color="text.secondary">Direct URL:</Typography>
                               <Box display="flex" alignItems="center" gap={1}>
                                 <Typography variant="body2" sx={{ wordBreak: 'break-all', flex: 1 }}>
-                                  {workspace.url}/vnc.html
+                                  {workspace.url}
                                 </Typography>
                                 <Tooltip title="Copy URL">
-                                  <IconButton size="small" onClick={() => copyToClipboard(`${workspace.url}/vnc.html`)}>
+                                  <IconButton size="small" onClick={() => copyToClipboard(workspace.url)}>
                                     <CopyIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
-                                <Tooltip title="Open in new tab">
-                                  <IconButton size="small" component={Link} href={`${workspace.url}/vnc.html`} target="_blank">
-                                    <OpenIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
                               </Box>
+                            </Box>
+
+                            <Box sx={{ mb: 1 }}>
+                              <Typography variant="caption" color="text.secondary">Username:</Typography>
+                              <Typography variant="body2" fontFamily="monospace" sx={{ bgcolor: 'white', px: 1, py: 0.5, borderRadius: 1, border: '1px solid #ddd', display: 'inline-block' }}>
+                                kasm_user
+                              </Typography>
                             </Box>
 
                             <Box>
@@ -579,13 +646,17 @@ function App() {
                             </Box>
                           </Paper>
 
+                          <Alert severity="info" sx={{ mb: 2 }}>
+                            Connect via VPN, then open the workspace URL in your browser.
+                          </Alert>
+
                           <Box display="flex" gap={1}>
                             <Button
                               variant="contained"
                               color="primary"
                               startIcon={<OpenIcon />}
                               component={Link}
-                              href={`${workspace.url}/vnc.html`}
+                              href={workspace.dnsName ? `https://${workspace.dnsName}:${workspace.nodePort}` : workspace.url}
                               target="_blank"
                               sx={{ flex: 1 }}
                             >
@@ -596,6 +667,7 @@ function App() {
                               color="error"
                               startIcon={<DeleteIcon />}
                               onClick={() => handleDeleteWorkspace(workspace.employeeId)}
+                              disabled={loading}
                             >
                               Delete
                             </Button>

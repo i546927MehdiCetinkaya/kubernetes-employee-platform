@@ -40,6 +40,12 @@ variable "enable_directory_service" {
   default     = false
 }
 
+variable "route53_zone_arn" {
+  description = "ARN of the Route53 hosted zone for workspace DNS records"
+  type        = string
+  default     = ""
+}
+
 variable "environment" {
   description = "Environment name"
   type        = string

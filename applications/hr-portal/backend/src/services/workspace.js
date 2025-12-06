@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const dynamodbService = require('./dynamodb');
 const ssmService = require('./ssm');
 const emailService = require('./email');
+const dnsService = require('./dns');
 const logger = require('../utils/logger');
 
 // Initialize Kubernetes client with fallback
@@ -155,9 +156,16 @@ async function provisionWorkspace(employee) {
     throw new Error('Kubernetes client not available. Cannot provision workspace.');
   }
 
+  // Check if employee already has an active workspace
+  const existingWorkspace = await dynamodbService.getWorkspaceByEmployee(employee.employeeId);
+  if (existingWorkspace && existingWorkspace.status === 'active') {
+    logger.warn(`Employee ${employee.employeeId} already has an active workspace: ${existingWorkspace.workspaceId}`);
+    throw new Error(`Employee already has an active workspace. Delete the existing workspace first.`);
+  }
+
   const workspaceId = uuidv4();
   const department = getDepartment(employee);
-  const workspaceName = sanitizeK8sName(`ws-${employee.employeeId}`);
+  const workspaceName = sanitizeK8sName(`ws-${workspaceId}`);
   const vncPassword = generateSecurePassword();
 
   logger.info(`Provisioning Kasm workspace for ${employee.employeeId}, department: ${department}`);
@@ -182,18 +190,34 @@ async function provisionWorkspace(employee) {
     await createWorkspaceService(workspaceName, employee.employeeId);
     logger.info(`Service created for ${workspaceName}`);
 
-    // 6. Wait for pod to be ready and get access URL
-    // Use 300 seconds timeout to allow for image pull (Kasm images are ~3GB)
-    const accessUrl = await waitForWorkspaceReady(workspaceName, 300);
-    logger.info(`Workspace ready at: ${accessUrl}`);
+    // 6. Wait for pod to be ready and get NodePort + Node IP
+    const { nodePort, nodeIp } = await waitForWorkspaceReady(workspaceName, 300);
+    logger.info(`Workspace ready on node ${nodeIp}:${nodePort}`);
 
-    // 7. Save workspace metadata
+    // 7. Create personal DNS record (firstname.lastname.innovatech.local)
+    let accessUrl;
+    let dnsName;
+    try {
+      const dnsResult = await dnsService.createWorkspaceDnsRecord(employee, nodeIp, nodePort);
+      accessUrl = dnsResult.url;
+      dnsName = dnsResult.dnsName;
+      logger.info(`DNS record created: ${dnsName} -> ${nodeIp}`);
+    } catch (dnsError) {
+      logger.warn(`DNS creation failed, using fallback URL: ${dnsError.message}`);
+      accessUrl = `https://${nodeIp}:${nodePort}`;
+      dnsName = null;
+    }
+
+    // 8. Save workspace metadata
     const workspace = {
       workspaceId,
       employeeId: employee.employeeId,
       name: workspaceName,
       department,
       url: accessUrl,
+      dnsName: dnsName,
+      nodeIp: nodeIp,
+      nodePort: nodePort,
       vncPort: 6901,
       status: 'active',
       type: 'kasm',
@@ -207,14 +231,14 @@ async function provisionWorkspace(employee) {
     await dynamodbService.createWorkspace(workspace);
     logger.info(`Workspace metadata saved to DynamoDB`);
 
-    // 8. Store password in SSM
+    // 9. Store password in SSM
     try {
       await ssmService.storeTemporaryPassword(employee.employeeId, vncPassword);
     } catch (ssmError) {
       logger.warn(`Failed to store password in SSM: ${ssmError.message}`);
     }
 
-    // 9. Send welcome email
+    // 10. Send welcome email
     emailService.sendWelcomeEmail(employee, workspace, vncPassword)
       .then(() => logger.info(`Welcome email sent to ${employee.email}`))
       .catch(err => logger.warn(`Failed to send welcome email: ${err.message}`));
@@ -503,7 +527,7 @@ async function createWorkspaceService(name, employeeId) {
 }
 
 /**
- * Wait for workspace pod to be ready
+ * Wait for workspace pod to be ready and return node details
  */
 async function waitForWorkspaceReady(name, timeoutSeconds = 120) {
   const startTime = Date.now();
@@ -521,8 +545,20 @@ async function waitForWorkspaceReady(name, timeoutSeconds = 120) {
           const svcResponse = await k8sApi.readNamespacedService(`${name}-svc`, WORKSPACE_NAMESPACE);
           const nodePort = svcResponse.body.spec.ports[0].nodePort;
           
-          // Return VPN-accessible URL
-          return `https://workspace.innovatech.local:${nodePort}`;
+          // Get the node IP where the pod is running
+          const nodeName = pod.spec.nodeName;
+          const nodeResponse = await k8sApi.readNode(nodeName);
+          const nodeIp = nodeResponse.body.status.addresses.find(
+            addr => addr.type === 'InternalIP'
+          )?.address;
+          
+          if (!nodeIp) {
+            throw new Error(`Could not determine node IP for ${nodeName}`);
+          }
+          
+          logger.info(`Workspace ${name} ready on node ${nodeName} (${nodeIp}:${nodePort})`);
+          
+          return { nodePort, nodeIp, nodeName };
         }
       }
       
@@ -550,15 +586,32 @@ async function deprovisionWorkspace(employeeId) {
   }
 
   try {
+    // Get employee data for DNS cleanup
+    const employee = await dynamodbService.getEmployee(employeeId);
+    
     const workspace = await dynamodbService.getWorkspaceByEmployee(employeeId);
     if (!workspace) {
       logger.warn(`No workspace found for employee ${employeeId}`);
       return;
     }
 
+    // Clean up Kubernetes resources
     await cleanupWorkspace(workspace.name);
+    
+    // Delete DNS record
+    if (employee && workspace.nodeIp) {
+      try {
+        await dnsService.deleteWorkspaceDnsRecord(employee, workspace.nodeIp);
+        logger.info(`DNS record deleted for ${employeeId}`);
+      } catch (dnsError) {
+        logger.warn(`Failed to delete DNS record: ${dnsError.message}`);
+      }
+    }
+    
+    // Delete workspace from DynamoDB
     await dynamodbService.deleteWorkspace(workspace.workspaceId);
     
+    // Delete SSM password
     try {
       await ssmService.deleteTemporaryPassword(employeeId);
     } catch (e) {
