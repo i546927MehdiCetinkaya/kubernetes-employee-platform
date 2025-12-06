@@ -74,13 +74,13 @@ function Login({ onLoginSuccess }) {
             <form onSubmit={handleSubmit}>
               <TextField
                 fullWidth
-                label="Email"
-                type="email"
+                label="Username"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 margin="normal"
                 required
-                autoComplete="email"
+                autoComplete="username"
                 autoFocus
               />
               <TextField
