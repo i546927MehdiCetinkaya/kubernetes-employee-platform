@@ -11,7 +11,8 @@ import {
   Container,
 } from '@mui/material';
 import { Lock as LockIcon } from '@mui/icons-material';
-import { signIn } from './cognito';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://hr-portal-backend';
 
 function Login({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
@@ -25,19 +26,31 @@ function Login({ onLoginSuccess }) {
     setError(null);
 
     try {
-      const user = await signIn(email, password);
-      onLoginSuccess(user);
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: email,
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      // Store token in localStorage
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      onLoginSuccess(data.user);
     } catch (err) {
       console.error('Login error:', err);
-      if (err.code === 'UserNotFoundException') {
-        setError('User not found. Please contact your administrator.');
-      } else if (err.code === 'NotAuthorizedException') {
-        setError('Incorrect email or password.');
-      } else if (err.code === 'NewPasswordRequired') {
-        setError('Please reset your password on first login.');
-      } else {
-        setError(err.message || 'An error occurred during login.');
-      }
+      setError(err.message || 'An error occurred during login.');
     } finally {
       setLoading(false);
     }
