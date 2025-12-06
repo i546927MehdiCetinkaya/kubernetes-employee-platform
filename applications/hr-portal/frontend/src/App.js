@@ -175,32 +175,17 @@ function App() {
     setError(null);
     setSuccess(null);
     
-    try {
-      // Update status: Creating Kubernetes resources
-      setProvisioningEmployees(prev => new Map(prev).set(employeeId, 'Creating Kubernetes pod and service...'));
-      
-      const response = await axios.post(`${API_BASE_URL}/api/workspaces/provision/${employeeId}`);
-      const workspace = response.data.workspace;
-      
-      // Update status: DNS configuration
-      setProvisioningEmployees(prev => new Map(prev).set(employeeId, 'Configuring DNS record...'));
-      
-      setNewWorkspace(workspace);
-      setSuccess(`✓ Workspace provisioned successfully! Access: ${workspace.dnsName || workspace.url}`);
-      
-      // Refresh workspaces list
-      await fetchWorkspaces();
-      
-      // Keep provisioning status visible until workspace fully appears in the list
-      // Poll for workspace completion (backend confirms it's ready)
-      let pollAttempts = 0;
-      const maxPollAttempts = 40; // 40 attempts * 5 seconds = 3+ minutes max
-      
-      const pollInterval = setInterval(async () => {
+    // Start polling IMMEDIATELY to detect workspace as soon as it's created
+    let pollAttempts = 0;
+    const maxPollAttempts = 60; // 60 attempts * 5 seconds = 5 minutes max
+    let pollInterval = null;
+    
+    const startPolling = () => {
+      pollInterval = setInterval(async () => {
         pollAttempts++;
         
         try {
-          // Refresh workspace list to check if it appears
+          // Refresh workspace list to check if workspace appears
           await fetchWorkspaces();
           
           // Check if workspace now exists in the list
@@ -224,14 +209,40 @@ function App() {
               return newMap;
             });
             setError('Workspace provisioning timed out. Please refresh the page to check status.');
+          } else {
+            // Update status message based on time elapsed
+            const elapsed = pollAttempts * 5; // seconds
+            if (elapsed > 120) {
+              setProvisioningEmployees(prev => new Map(prev).set(employeeId, 'Finalizing workspace setup...'));
+            } else if (elapsed > 60) {
+              setProvisioningEmployees(prev => new Map(prev).set(employeeId, 'Configuring DNS record...'));
+            } else {
+              setProvisioningEmployees(prev => new Map(prev).set(employeeId, 'Creating Kubernetes pod and service...'));
+            }
           }
         } catch (err) {
           console.error('Error polling workspace status:', err);
           // Continue polling even on error
         }
       }, 5000); // Poll every 5 seconds
+    };
+    
+    // Start polling immediately
+    startPolling();
+    
+    try {
+      // Trigger backend provisioning (this will take 2-5 minutes)
+      const response = await axios.post(`${API_BASE_URL}/api/workspaces/provision/${employeeId}`);
+      
+      // Backend completed successfully
+      console.log('Backend provisioning completed:', response.data);
       
     } catch (err) {
+      // Clear polling on error
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      
       const errorMsg = err.response?.data?.error || err.message;
       setError(`✗ Failed to provision workspace: ${errorMsg}`);
       console.error('Error provisioning workspace:', err);
