@@ -191,7 +191,7 @@ async function provisionWorkspace(employee) {
     logger.info(`Service created for ${workspaceName}`);
 
     // 6. Wait for pod to be ready and get NodePort + Node IP
-    const { nodePort, nodeIp } = await waitForWorkspaceReady(workspaceName, 300);
+    const { nodePort, nodeIp } = await waitForWorkspaceReady(workspaceName, 600);
     logger.info(`Workspace ready on node ${nodeIp}:${nodePort}`);
 
     // 7. Create personal DNS record (firstname.lastname.innovatech.local)
@@ -429,7 +429,7 @@ async function createKasmPod(name, employee, department, workspaceId) {
           tcpSocket: {
             port: 6901
           },
-          initialDelaySeconds: 60,
+          initialDelaySeconds: 120,
           periodSeconds: 30,
           timeoutSeconds: 10,
           failureThreshold: 5
@@ -438,11 +438,11 @@ async function createKasmPod(name, employee, department, workspaceId) {
           tcpSocket: {
             port: 6901
           },
-          initialDelaySeconds: 15,
-          periodSeconds: 5,
-          timeoutSeconds: 3,
+          initialDelaySeconds: 30,
+          periodSeconds: 10,
+          timeoutSeconds: 5,
           successThreshold: 1,
-          failureThreshold: 30
+          failureThreshold: 60
         }
       }],
       volumes: [
