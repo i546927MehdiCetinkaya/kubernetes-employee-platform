@@ -29,8 +29,8 @@ flowchart TB
                         BE["⚡ Backend\nNode.js + Express"]
                     end
                     subgraph NS2["📦 workspaces namespace"]
-                        W1["🖥️ jan-jansen"]
-                        W2["🖥️ kees-van-der-spek"]
+                        W1["🖥️ jan.jansen\nNodePort 30123"]
+                        W2["🖥️ kees.vanderspek\nNodePort 30456"]
                         WN["🖥️ ...more"]
                     end
                 end
@@ -41,6 +41,7 @@ flowchart TB
         ECR["📦 ECR\nContainer Images"]
         AD["🔐 Directory Service\ninnovatech.local"]
         SSM["🔧 SSM\nSecrets"]
+        R53["🌐 Route53\nPrivate Zone\ninnovatech.local"]
     end
 
     HR --> NLB1
@@ -49,10 +50,12 @@ flowchart TB
     FE --> BE
     NLB2 --> W1 & W2 & WN
     BE --> DDB
+    BE --> R53
     BE -.->|"provision"| NS2
     EKS -.-> ECR
     EKS -.-> AD
     BE -.-> SSM
+    EMP -.->|"DNS lookup"| R53
 
     style NLB1 fill:#0ff,stroke:#0ff,color:#000
     style NLB2 fill:#0ff,stroke:#0ff,color:#000
@@ -95,17 +98,23 @@ sequenceDiagram
         Note over HR,WS: Workspace Provisioning
         HR->>FE: Click "Provision Workspace"
         FE->>BE: POST /api/workspaces
-        BE->>K8S: Create Pod + Service + LB
+        BE->>DB: Check for duplicate
+        BE->>K8S: Create Pod + NodePort Service
         K8S->>WS: Start Container
-        WS-->>K8S: Ready
-        K8S-->>BE: LoadBalancer URL
-        BE->>DB: Save Workspace
+        WS-->>K8S: Ready (TCP Check)
+        K8S-->>BE: NodeIP + NodePort
+        BE->>Route53: Create DNS A Record
+        Note over Route53: firstname.lastname.innovatech.local → NodeIP
+        BE->>DB: Save Workspace + URL
         BE-->>FE: ✅ Workspace Ready
     end
 
     rect rgb(20, 40, 40)
         Note over EMP,WS: Desktop Access
-        EMP->>WS: Open URL in Browser
+        Note over EMP: Connect to OpenVPN
+        EMP->>Route53: DNS Lookup firstname.lastname.innovatech.local
+        Route53-->>EMP: NodeIP (10.0.x.x)
+        EMP->>WS: HTTPS via VPN to NodeIP:NodePort
         WS-->>EMP: 🖥️ Ubuntu Desktop via noVNC
     end
 ```

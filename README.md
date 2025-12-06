@@ -78,6 +78,13 @@ http://ac0cd11d903e646dc890a3606c5999df-8a0c923d8bfa6cfe.elb.eu-west-1.amazonaws
 
 ### 🔗 Personal Workspace URLs
 
+Elke medewerker krijgt een **persoonlijke DNS record** in Route53:
+- **Format**: `https://firstname.lastname.innovatech.local:PORT`
+- **Voorbeeld**: `https://jan.jansen.innovatech.local:30123`
+- **DNS Zone**: Private Hosted Zone `innovatech.local` (Route53)
+- **Toegang**: Alleen via VPN (wijst naar EKS node IP in private subnet)
+- **Auto-Cleanup**: DNS record wordt verwijderd bij workspace deprovision
+
 Each employee gets a **personal DNS record**:
 ```
 Format: https://{firstname}.{lastname}.innovatech.local:{port}
