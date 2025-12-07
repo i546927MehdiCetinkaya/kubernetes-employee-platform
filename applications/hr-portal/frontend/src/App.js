@@ -28,6 +28,10 @@ import {
   Link,
   Tooltip,
   Avatar,
+  Menu,
+  Divider,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -39,34 +43,39 @@ import {
   ContentCopy as CopyIcon,
   OpenInNew as OpenIcon,
   Logout as LogoutIcon,
+  AccountCircle as AccountCircleIcon,
+  Security as SecurityIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import axios from 'axios';
 import Login from './auth/Login';
-import { isAuthenticated, getCurrentUser, signOut, getIdToken, isHRAdmin } from './auth/cognito';
+import ErrorBoundary from './components/ErrorBoundary';
+import {
+  isAuthenticated,
+  getCurrentUser,
+  signOut,
+  hasPermission,
+  getDisplayName,
+  getUserGroups,
+  getUserRole,
+} from './auth/auth';
+import { employees as employeesAPI, workspaces as workspacesAPI } from './api/api';
 
-// Create Material-UI theme
+// Create Material-UI theme with dark mode
 const theme = createTheme({
   palette: {
+    mode: 'dark',
     primary: {
-      main: '#1976d2',
+      main: '#2196f3',
     },
     secondary: {
-      main: '#dc004e',
+      main: '#f50057',
+    },
+    background: {
+      default: '#1a1a1a',
+      paper: '#2d2d2d',
     },
   },
-});
-
-// API configuration - use same origin (LoadBalancer handles routing)
-const API_BASE_URL = process.env.REACT_APP_API_URL || window.location.origin;
-
-// Configure axios to include auth token
-axios.interceptors.request.use((config) => {
-  const token = getIdToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
 });
 
 function App() {
@@ -81,6 +90,7 @@ function App() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
   const [newWorkspace, setNewWorkspace] = useState(null);
+  const [userMenuAnchor, setUserMenuAnchor] = useState(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -135,11 +145,14 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/employees`);
-      setEmployees(response.data.employees || []);
+      const data = await employeesAPI.getAll();
+      setEmployees(data.employees || []);
     } catch (err) {
-      setError(`Failed to fetch employees: ${err.response?.data?.message || err.message}`);
-      console.error('Error fetching employees:', err);
+      const message = err.code === 'PERMISSION_DENIED'
+        ? 'You do not have permission to view employees. Contact your administrator.'
+        : `Failed to fetch employees: ${err.message}`;
+      setError(message);
+      console.error('[App] Error fetching employees:', err);
     } finally {
       setLoading(false);
     }
@@ -147,10 +160,11 @@ function App() {
 
   const fetchWorkspaces = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/workspaces`);
-      setWorkspaces(response.data.workspaces || []);
+      const data = await workspacesAPI.getAll();
+      setWorkspaces(data.workspaces || []);
     } catch (err) {
-      console.error('Error fetching workspaces:', err);
+      console.error('[App] Error fetching workspaces:', err);
+      // Don't show error for workspaces - just log it
     }
   };
 
@@ -232,10 +246,10 @@ function App() {
     
     try {
       // Trigger backend provisioning (this will take 2-5 minutes)
-      const response = await axios.post(`${API_BASE_URL}/api/workspaces/provision/${employeeId}`);
+      const response = await workspacesAPI.provision(employeeId);
       
       // Backend completed successfully
-      console.log('Backend provisioning completed:', response.data);
+      console.log('[App] Backend provisioning completed:', response);
       
     } catch (err) {
       // Clear polling on error
@@ -243,9 +257,11 @@ function App() {
         clearInterval(pollInterval);
       }
       
-      const errorMsg = err.response?.data?.error || err.message;
-      setError(`✗ Failed to provision workspace: ${errorMsg}`);
-      console.error('Error provisioning workspace:', err);
+      const errorMsg = err.code === 'PERMISSION_DENIED'
+        ? 'You do not have permission to provision workspaces. Contact your administrator.'
+        : `Failed to provision workspace: ${err.message}`;
+      setError(`✗ ${errorMsg}`);
+      console.error('[App] Error provisioning workspace:', err);
       
       // Remove from provisioning state immediately on error
       setProvisioningEmployees(prev => {
@@ -257,14 +273,23 @@ function App() {
   };
 
   const handleDeleteWorkspace = async (employeeId) => {
+    // Check permission first
+    if (!hasPermission('workspaces', 'delete')) {
+      setError('You do not have permission to delete workspaces. Contact your administrator.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      await axios.delete(`${API_BASE_URL}/api/workspaces/${employeeId}`);
+      await workspacesAPI.delete(employeeId);
       setSuccess('Workspace deleted successfully!');
       await fetchWorkspaces();
     } catch (err) {
-      setError(`Failed to delete workspace: ${err.response?.data?.error || err.message}`);
+      const message = err.code === 'PERMISSION_DENIED'
+        ? 'You do not have permission to delete workspaces. Contact your administrator.'
+        : `Failed to delete workspace: ${err.message}`;
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -297,10 +322,16 @@ function App() {
   };
 
   const handleCreateEmployee = async () => {
+    // Check permission first
+    if (!hasPermission('employees', 'create')) {
+      setError('You do not have permission to create employees. Contact your administrator.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      await axios.post(`${API_BASE_URL}/api/employees`, formData);
+      await employeesAPI.create(formData);
       setSuccess(`Employee ${formData.firstName} ${formData.lastName} created successfully!`);
       setOpenDialog(false);
       setFormData({
@@ -312,24 +343,36 @@ function App() {
       });
       fetchEmployees();
     } catch (err) {
-      setError(`Failed to create employee: ${err.response?.data?.message || err.message}`);
-      console.error('Error creating employee:', err);
+      const message = err.code === 'PERMISSION_DENIED'
+        ? 'You do not have permission to create employees. Contact your administrator.'
+        : `Failed to create employee: ${err.message}`;
+      setError(message);
+      console.error('[App] Error creating employee:', err);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteEmployee = async (employeeId) => {
+    // Check permission first
+    if (!hasPermission('employees', 'delete')) {
+      setError('You do not have permission to delete employees. Contact your administrator.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      await axios.delete(`${API_BASE_URL}/api/employees/${employeeId}`);
+      await employeesAPI.delete(employeeId);
       setSuccess('Employee deleted successfully!');
       setDeleteConfirm(null);
       fetchEmployees();
     } catch (err) {
-      setError(`Failed to delete employee: ${err.response?.data?.message || err.message}`);
-      console.error('Error deleting employee:', err);
+      const message = err.code === 'PERMISSION_DENIED'
+        ? 'You do not have permission to delete employees. Contact your administrator.'
+        : `Failed to delete employee: ${err.message}`;
+      setError(message);
+      console.error('[App] Error deleting employee:', err);
     } finally {
       setLoading(false);
     }
@@ -377,34 +420,88 @@ function App() {
 
   return (
     <ThemeProvider theme={theme}>
-      <Box sx={{ flexGrow: 1 }}>
-        {/* App Bar */}
-        <AppBar position="static">
-          <Toolbar>
-            <PersonIcon sx={{ mr: 2 }} />
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              InnovaTech HR Portal
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Chip
-                avatar={<Avatar>{user.name?.charAt(0) || 'U'}</Avatar>}
-                label={user.name || user.email}
-                variant="outlined"
-                sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.5)' }}
-              />
-              {user.groups?.length > 0 && (
-                <Chip
-                  label={user.groups[0]}
-                  size="small"
-                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
-                />
-              )}
-              <IconButton color="inherit" onClick={handleLogout} title="Logout">
-                <LogoutIcon />
-              </IconButton>
-            </Box>
-          </Toolbar>
-        </AppBar>
+      <ErrorBoundary>
+        <Box sx={{ flexGrow: 1 }}>
+          {/* App Bar */}
+          <AppBar position="static">
+            <Toolbar>
+              <PersonIcon sx={{ mr: 2 }} />
+              <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+                InnovaTech HR Portal
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                {/* User Profile Button */}
+                <Button
+                  color="inherit"
+                  onClick={(e) => setUserMenuAnchor(e.currentTarget)}
+                  endIcon={<ExpandMoreIcon />}
+                  sx={{ textTransform: 'none' }}
+                >
+                  <Box sx={{ textAlign: 'right', mr: 1 }}>
+                    <Typography variant="body2">{getDisplayName()}</Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                      {getUserRole()}
+                    </Typography>
+                  </Box>
+                  <Avatar sx={{ bgcolor: 'primary.dark' }}>
+                    {getDisplayName().charAt(0).toUpperCase()}
+                  </Avatar>
+                </Button>
+
+                {/* User Menu */}
+                <Menu
+                  anchorEl={userMenuAnchor}
+                  open={Boolean(userMenuAnchor)}
+                  onClose={() => setUserMenuAnchor(null)}
+                  PaperProps={{
+                    sx: { width: 300, mt: 1 }
+                  }}
+                >
+                  {/* User Info */}
+                  <Box sx={{ px: 2, py: 1.5 }}>
+                    <Typography variant="subtitle1">{getDisplayName()}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {user?.email || user?.username}
+                    </Typography>
+                  </Box>
+                  <Divider />
+
+                  {/* User Groups */}
+                  <Box sx={{ px: 2, py: 1.5 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                      Groups
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                      {getUserGroups().length > 0 ? (
+                        getUserGroups().map((group) => (
+                          <Chip
+                            key={group}
+                            label={group}
+                            size="small"
+                            icon={<SecurityIcon />}
+                            variant="outlined"
+                          />
+                        ))
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          No groups assigned
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                  <Divider />
+
+                  {/* Logout */}
+                  <MenuItem onClick={handleLogout}>
+                    <ListItemIcon>
+                      <LogoutIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Logout</ListItemText>
+                  </MenuItem>
+                </Menu>
+              </Box>
+            </Toolbar>
+          </AppBar>
 
         {/* Main Content */}
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -452,14 +549,16 @@ function App() {
                     >
                       Refresh
                     </Button>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={() => setOpenDialog(true)}
-                      disabled={loading}
-                    >
-                      Add Employee
-                    </Button>
+                    {hasPermission('employees', 'create') && (
+                      <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => setOpenDialog(true)}
+                        disabled={loading}
+                      >
+                        Add Employee
+                      </Button>
+                    )}
                   </Box>
                 </Box>
               </Paper>
@@ -502,13 +601,15 @@ function App() {
                                     {employee.email}
                                   </Typography>
                                 </Box>
-                                <IconButton
-                                  color="error"
-                                  size="small"
-                                  onClick={() => setDeleteConfirm(employee)}
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
+                                {hasPermission('employees', 'delete') && (
+                                  <IconButton
+                                    color="error"
+                                    size="small"
+                                    onClick={() => setDeleteConfirm(employee)}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                )}
                               </Box>
                               
                               <Box display="flex" gap={1} mb={2}>
@@ -566,7 +667,7 @@ function App() {
                                     The button will automatically reappear when complete.
                                   </Typography>
                                 </Box>
-                              ) : (
+                              ) : hasPermission('workspaces', 'create') ? (
                                 <Button
                                   fullWidth
                                   variant="contained"
@@ -582,6 +683,19 @@ function App() {
                                     ? 'Provisioning in progress...' 
                                     : 'Provision Workspace'}
                                 </Button>
+                              ) : (
+                                <Tooltip title="You do not have permission to provision workspaces">
+                                  <span>
+                                    <Button
+                                      fullWidth
+                                      variant="outlined"
+                                      disabled
+                                      sx={{ opacity: 0.5 }}
+                                    >
+                                      Provision Workspace (No Permission)
+                                    </Button>
+                                  </span>
+                                </Tooltip>
                               )}
                             </CardContent>
                           </Card>
@@ -739,15 +853,17 @@ function App() {
                             >
                               Open Desktop
                             </Button>
-                            <Button
-                              variant="outlined"
-                              color="error"
-                              startIcon={<DeleteIcon />}
-                              onClick={() => handleDeleteWorkspace(workspace.employeeId)}
-                              disabled={loading}
-                            >
-                              Delete
-                            </Button>
+                            {hasPermission('workspaces', 'delete') && (
+                              <Button
+                                variant="outlined"
+                                color="error"
+                                startIcon={<DeleteIcon />}
+                                onClick={() => handleDeleteWorkspace(workspace.employeeId)}
+                                disabled={loading}
+                              >
+                                Delete
+                              </Button>
+                            )}
                           </Box>
                         </CardContent>
                       </Card>
@@ -943,6 +1059,7 @@ function App() {
           </DialogActions>
         </Dialog>
       </Box>
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }

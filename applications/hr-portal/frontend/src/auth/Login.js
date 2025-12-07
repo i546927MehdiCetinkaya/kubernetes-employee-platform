@@ -9,17 +9,31 @@ import {
   Alert,
   CircularProgress,
   Container,
+  Chip,
 } from '@mui/material';
-import { Lock as LockIcon } from '@mui/icons-material';
-
-// Use empty string for API_URL - nginx will proxy /api/* to backend
-const API_URL = '';
+import { Lock as LockIcon, Info as InfoIcon } from '@mui/icons-material';
+import { auth as authAPI } from '../api/api';
+import { signIn } from './auth';
 
 function Login({ onLoginSuccess }) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [authHealth, setAuthHealth] = useState(null);
+
+  // Check auth health on mount
+  React.useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const health = await authAPI.health();
+        setAuthHealth(health);
+      } catch (err) {
+        console.warn('[Login] Could not check auth health:', err);
+      }
+    };
+    checkHealth();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,30 +41,14 @@ function Login({ onLoginSuccess }) {
     setError(null);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: email,
-          password: password,
-        }),
-      });
+      const response = await authAPI.login(username, password);
 
-      const data = await response.json();
+      // Store token and user info using auth utility
+      signIn(response.token, response.user);
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
-
-      // Store token in localStorage
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      onLoginSuccess(data.user);
+      onLoginSuccess(response.user);
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('[Login] Login error:', err);
       setError(err.message || 'An error occurred during login.');
     } finally {
       setLoading(false);
@@ -77,6 +75,28 @@ function Login({ onLoginSuccess }) {
               <Typography variant="body2" color="text.secondary">
                 Sign in to manage employee lifecycle
               </Typography>
+
+              {/* Auth Health Status */}
+              {authHealth && (
+                <Box sx={{ mt: 2, display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <Chip
+                    icon={<InfoIcon />}
+                    label={authHealth.ldap?.healthy ? 'AD: Connected' : 'AD: Fallback Mode'}
+                    color={authHealth.ldap?.healthy ? 'success' : 'warning'}
+                    size="small"
+                    variant="outlined"
+                  />
+                  {authHealth.fallback?.enabled && (
+                    <Chip
+                      icon={<InfoIcon />}
+                      label="Emergency Access: Available"
+                      color="info"
+                      size="small"
+                      variant="outlined"
+                    />
+                  )}
+                </Box>
+              )}
             </Box>
 
             {error && (
@@ -90,12 +110,13 @@ function Login({ onLoginSuccess }) {
                 fullWidth
                 label="Username"
                 type="text"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 margin="normal"
                 required
                 autoComplete="username"
                 autoFocus
+                placeholder="firstname.lastname"
               />
               <TextField
                 fullWidth
@@ -120,7 +141,7 @@ function Login({ onLoginSuccess }) {
             </form>
 
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
-              Protected by Zero Trust Security
+              Protected by Zero Trust Security • Active Directory Integration
             </Typography>
           </CardContent>
         </Card>
