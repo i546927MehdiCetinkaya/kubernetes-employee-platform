@@ -416,5 +416,4 @@ Fontys University of Applied Sciences | Semester 3 | 2025
 
 ---
 
-**Repository:** [github.com/i546927MehdiCetinkaya/casestudy3](https://github.com/i546927MehdiCetinkaya/casestudy3)  
 **License:** MIT
